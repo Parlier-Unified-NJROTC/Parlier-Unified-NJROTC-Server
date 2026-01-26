@@ -4,7 +4,7 @@ services:
     env: python
     region: oregon  # or virginia/ohio
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn api.app:app
+    startCommand: gunicorn api.app:app --workers 4 --threads 2
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
