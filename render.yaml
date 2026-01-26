@@ -2,26 +2,16 @@ services:
   - type: web
     name: njrotc-backend
     env: python
-    region: oregon  # or virginia/ohio
+    region: oregon
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn api.app:app --workers 4 --threads 2
+    startCommand: gunicorn api.app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
       - key: PYTHON_EMAIL_CURSE
-        sync: false  # Set in Render dashboard
+        sync: false
       - key: FLASK_ENV
         value: production
+      - key: PORT
+        value: 10000
     autoDeploy: true
-
-  # Optional: Static site for frontend (if separate)
-  - type: static
-    name: njrotc-frontend
-    buildCommand: |
-      echo "Building static site..."
-      # Add any build steps here
-    publish: ./static
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
