@@ -33,7 +33,7 @@ def create_app():
             print(f"Recipient: {recipient_email}")
             
             # Import and run Gmail API bot
-            from workers.gmail_api_bot import GmailAPIBot
+            from workers.gmail_bot import GmailAPIBot
             
             bot = GmailAPIBot(last_name, rank, selected_items, recipient_email)
             success = bot.send_email()
