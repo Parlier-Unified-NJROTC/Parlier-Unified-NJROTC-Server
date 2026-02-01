@@ -1,38 +1,39 @@
 #!/usr/bin/env python3
 """
-Email bot for NJROTC - Render compatible
+Gmail API Email Bot for NJROTC - Render compatible
 """
 import os
 import sys
 import json
-import smtplib
-from email.mime.multipart import MIMEMultipart
+import base64
 from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from dotenv import load_dotenv
+
+# Gmail API imports
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+import pickle
 
 # Load environment variables from Render
 load_dotenv()
 
-print("=== GMAIL BOT STARTING ===")  # Debug print
+print("=== GMAIL API BOT STARTING ===")
 print(f"Python path: {sys.path}")
 print(f"Current dir: {os.getcwd()}")
 
-class EmailBot:
+class GmailAPIBot:
     def __init__(self, last_name="", rank="", selected_items=None, recipient_email=""):
-        print(f"Initializing EmailBot for: {recipient_email}")
+        print(f"Initializing GmailAPIBot for: {recipient_email}")
         
+        # Sender email (must be the same as authenticated account)
         self.sender_email = os.getenv("SENDER_EMAIL", "njrotcparlier@gmail.com")
-        self.password = os.getenv("PYTHON_EMAIL_CURSE")
         
-        print(f"Sender email: {self.sender_email}")
-        print(f"Password configured: {'YES' if self.password else 'NO'}")
-        
-        if not self.password:
-            raise ValueError("Email password (PYTHON_EMAIL_CURSE) not configured")
-        
+        # Recipients
         self.recipients = [recipient_email] if recipient_email else []
         
         # Add admin notification email if needed
@@ -40,13 +41,14 @@ class EmailBot:
         if admin_email and admin_email not in self.recipients:
             self.recipients.append(admin_email)
         
+        # User info
         self.user_last_name = last_name
         self.rank = rank
         self.selected_items = selected_items or []
         self.full_title = f"{self.rank} {self.user_last_name}".strip()
         self.current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Determine email type
+        # Determine email type and content
         if "Signup" in str(self.selected_items):
             self.subject = "NJROTC Program Signup Confirmation"
             self.body_html = self.generate_signup_confirmation()
@@ -135,52 +137,95 @@ class EmailBot:
         </html>
         """
     
-    def send_email(self):
-        print("=== ATTEMPTING TO SEND EMAIL ===")
+    def authenticate_gmail(self):
+        """Authenticate with Gmail API using OAuth 2.0"""
+        SCOPES = ['https://www.googleapis.com/auth/gmail.send']
+        creds = None
         
-        if not self.password:
-            print("ERROR: Email password not configured.")
-            return False
+        # Try to get token from environment variable first (for Render)
+        token_json = os.getenv('GMAIL_TOKEN_JSON')
+        if token_json:
+            try:
+                token_info = json.loads(token_json)
+                creds = Credentials.from_authorized_user_info(token_info, SCOPES)
+                print("Loaded credentials from environment variable")
+            except Exception as e:
+                print(f"Error loading token from env: {e}")
+        
+        # If no token in env, try token.pickle file
+        if not creds or not creds.valid:
+            token_file = 'token.pickle'
+            if os.path.exists(token_file):
+                print(f"Loading credentials from {token_file}")
+                with open(token_file, 'rb') as token:
+                    creds = pickle.load(token)
+        
+        # If credentials are invalid or don't exist
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                print("Refreshing expired credentials")
+                creds.refresh(Request())
+            else:
+                print("No valid credentials found, need to authenticate")
+                # For Render, we need pre-authenticated token
+                return None
+        
+        return build('gmail', 'v1', credentials=creds)
+    
+    def create_message(self):
+        """Create a MIME message"""
+        message = MIMEMultipart('alternative')
+        message['to'] = ', '.join(self.recipients)
+        message['from'] = self.sender_email
+        message['subject'] = self.subject
+        
+        # Attach HTML body
+        message.attach(MIMEText(self.body_html, 'html'))
+        
+        # Encode the message
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        return {'raw': raw_message}
+    
+    def send_email(self):
+        """Send email using Gmail API"""
+        print("=== ATTEMPTING TO SEND EMAIL VIA GMAIL API ===")
         
         if not self.recipients:
             print("ERROR: No recipient email specified")
             return False
         
         try:
-            print(f"1. Creating email message...")
-            # Create message
-            msg = MIMEMultipart('alternative')
-            msg['From'] = self.sender_email
-            msg['To'] = ', '.join(self.recipients)
-            msg['Subject'] = self.subject
+            # Authenticate with Gmail API
+            service = self.authenticate_gmail()
+            if not service:
+                print("ERROR: Failed to authenticate with Gmail API")
+                print("Tip: You need to generate a token first (see README)")
+                return False
             
-            # Attach HTML body
-            msg.attach(MIMEText(self.body_html, 'html'))
+            # Create and send message
+            message = self.create_message()
+            print(f"Sending email to: {self.recipients}")
             
-            print(f"2. Connecting to SMTP server with SSL...")
-            # Try port 465 with SSL (Render might allow this)
-            try:
-                server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=30)
-                print(f"3. Logging in...")
-                server.login(self.sender_email, self.password)
-            except:
-                # Fallback to regular SMTP if SSL fails
-                print(f"3a. SSL failed, trying regular SMTP...")
-                server = smtplib.SMTP('smtp.gmail.com', 587, timeout=30)
-                print(f"3b. Starting TLS...")
-                server.starttls()
-                print(f"3c. Logging in...")
-                server.login(self.sender_email, self.password)
+            sent_message = service.users().messages().send(
+                userId='me', 
+                body=message
+            ).execute()
             
-            print(f"4. Sending email...")
-            # Send email
-            server.send_message(msg)
-            print(f"5. Closing connection...")
-            server.quit()
+            print(f"✓ Email sent successfully via Gmail API")
+            print(f"  Message ID: {sent_message['id']}")
+            print(f"  To: {', '.join(self.recipients)}")
+            print(f"  Time: {self.current_time}")
             
-            print(f"✓ Email sent successfully to {', '.join(self.recipients)}")
             return True
             
+        except HttpError as error:
+            print(f"✗ Gmail API HTTP Error: {error}")
+            if error.resp.status == 403:
+                print("  This usually means:")
+                print("  1. Gmail API not enabled in Google Cloud Console")
+                print("  2. OAuth consent screen not configured")
+                print("  3. Token doesn't have gmail.send permission")
+            return False
         except Exception as e:
             print(f"✗ Error sending email: {type(e).__name__}: {str(e)}")
             import traceback
@@ -188,7 +233,7 @@ class EmailBot:
             return False
 
 def main():
-    print("=== EMAIL BOT MAIN FUNCTION ===")
+    print("=== GMAIL API BOT MAIN FUNCTION ===")
     
     # Parse command line arguments
     if len(sys.argv) >= 5:
@@ -201,12 +246,12 @@ def main():
         print("Running in test mode...")
         last_name = "Test"
         rank = "Cadet"
-        selected_items = ["Test Item"]
+        selected_items = ["Test Item from Gmail API"]
         recipient_email = os.getenv("TEST_EMAIL", "test@example.com")
     
     # Create and send email
     try:
-        bot = EmailBot(last_name, rank, selected_items, recipient_email)
+        bot = GmailAPIBot(last_name, rank, selected_items, recipient_email)
         success = bot.send_email()
         
         if success:

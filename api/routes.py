@@ -27,18 +27,15 @@ def create_app():
         })
     
     def run_email_bot(last_name, rank, selected_items, recipient_email):
-        """Run email bot directly in thread"""
+        """Run email bot using Gmail API"""
         try:
-            print(f"=== STARTING EMAIL BOT ===")
+            print(f"=== STARTING GMAIL API BOT ===")
             print(f"Recipient: {recipient_email}")
-            print(f"Name: {last_name}")
-            print(f"Rank: {rank}")
-            print(f"Items: {selected_items}")
             
-            # Import and run email bot directly
-            from workers.gmail_bot import EmailBot
+            # Import and run Gmail API bot
+            from workers.gmail_api_bot import GmailAPIBot
             
-            bot = EmailBot(last_name, rank, selected_items, recipient_email)
+            bot = GmailAPIBot(last_name, rank, selected_items, recipient_email)
             success = bot.send_email()
             
             if success:
@@ -46,10 +43,10 @@ def create_app():
             else:
                 print(f"✗ Failed to send email to {recipient_email}")
                 
-            print(f"=== EMAIL BOT COMPLETE ===")
+            print(f"=== GMAIL API BOT COMPLETE ===")
             
         except Exception as e:
-            print(f"ERROR in email bot: {str(e)}")
+            print(f"ERROR in Gmail API bot: {str(e)}")
             import traceback
             traceback.print_exc()
     
