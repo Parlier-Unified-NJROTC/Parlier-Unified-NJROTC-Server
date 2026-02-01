@@ -13,15 +13,21 @@ from email import encoders
 from datetime import datetime
 from dotenv import load_dotenv
 
+
 load_dotenv()
 
 class EmailBot:
     def __init__(self, last_name="", rank="", selected_items=None, recipient_email=""):
         self.sender_email = os.getenv("SENDER_EMAIL", "njrotcparlier@gmail.com")
         self.password = os.getenv("PYTHON_EMAIL_CURSE")
+        
+        if not self.password:
+            raise ValueError("Email password (PYTHON_EMAIL_CURSE) not configured")
+        
         self.recipients = [recipient_email] if recipient_email else []
+        
         admin_email = os.getenv("ADMIN_EMAIL")
-        if admin_email:
+        if admin_email and admin_email not in self.recipients:
             self.recipients.append(admin_email)
         
         self.user_last_name = last_name
@@ -32,13 +38,13 @@ class EmailBot:
         
         # Determine email type
         if "Signup" in str(self.selected_items):
-            self.subject = "NJROTC Program Signup Request - test"
-            self.body_html = self.generate_signup_request()
+            self.subject = "NJROTC Program Signup Confirmation"
+            self.body_html = self.generate_signup_confirmation()
         else:
-            self.subject = "NJROTC Notification - test"
+            self.subject = "NJROTC Notification"
             self.body_html = self.generate_generic_email()
     
-    def generate_signup_request(self):
+    def generate_signup_confirmation(self):
         return f"""
         <html>
         <head>
@@ -54,7 +60,7 @@ class EmailBot:
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>NJROTC Program Signup Request</h1>
+                    <h1>NJROTC Program Signup Confirmation</h1>
                 </div>
                 <div class="content">
                     <p>Dear {self.full_title},</p>
@@ -126,19 +132,26 @@ def main():
         selected_items = json.loads(sys.argv[3])
         recipient_email = sys.argv[4]
     else:
+        # Test mode
+        print("Running in test mode...")
         last_name = "Test"
         rank = "Cadet"
         selected_items = ["Test Item"]
-        recipient_email = "test@example.com"
+        recipient_email = os.getenv("TEST_EMAIL", "test@example.com")
     
-    bot = EmailBot(last_name, rank, selected_items, recipient_email)
-    success = bot.send_email()
-    
-    if success:
-        print("Email process completed successfully")
-    else:
-        print("Email process failed")
-        sys.exit(1)
+    try:
+        bot = EmailBot(last_name, rank, selected_items, recipient_email)
+        success = bot.send_email()
+        
+        if success:
+            print("Email process completed successfully")
+            return 0
+        else:
+            print("Email process failed")
+            return 1
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return 1
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
