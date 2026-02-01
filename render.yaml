@@ -3,15 +3,27 @@ services:
     name: njrotc-backend
     env: python
     region: oregon
+    plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn api.app:app --bind 0.0.0.0:$PORT
+    startCommand: gunicorn wsgi:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
       - key: PYTHON_EMAIL_CURSE
         sync: false
-      - key: FLASK_ENV
-        value: production
-      - key: PORT
-        value: 10000
-    autoDeploy: true
+      - key: ALLOWED_ORIGINS
+        value: https://parlier-unified-njrotc.github.io,https://localhost:3000
+    healthCheckPath: /health
+
+  # Background worker for email processing PS I don't know if this is necessary for code to run
+  - type: worker
+    name: email-worker
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m workers.email_queue
+    envVars:
+      - key: PYTHON_EMAIL_CURSE
+        sync: false
+      - key: REDIS_URL
+        sync: false
