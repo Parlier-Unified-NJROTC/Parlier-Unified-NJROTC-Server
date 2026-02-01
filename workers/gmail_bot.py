@@ -139,7 +139,7 @@ class EmailBot:
         print("=== ATTEMPTING TO SEND EMAIL ===")
         
         if not self.password:
-            print("ERROR: Email password not configured. Set PYTHON_EMAIL_CURSE environment variable.")
+            print("ERROR: Email password not configured.")
             return False
         
         if not self.recipients:
@@ -157,23 +157,28 @@ class EmailBot:
             # Attach HTML body
             msg.attach(MIMEText(self.body_html, 'html'))
             
-            print(f"2. Connecting to SMTP server...")
-            # Setup SMTP
-            server = smtplib.SMTP('smtp.gmail.com', 587)
-            print(f"3. Starting TLS...")
-            server.starttls()
-            print(f"4. Logging in...")
-            server.login(self.sender_email, self.password)
+            print(f"2. Connecting to SMTP server with SSL...")
+            # Try port 465 with SSL (Render might allow this)
+            try:
+                server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=30)
+                print(f"3. Logging in...")
+                server.login(self.sender_email, self.password)
+            except:
+                # Fallback to regular SMTP if SSL fails
+                print(f"3a. SSL failed, trying regular SMTP...")
+                server = smtplib.SMTP('smtp.gmail.com', 587, timeout=30)
+                print(f"3b. Starting TLS...")
+                server.starttls()
+                print(f"3c. Logging in...")
+                server.login(self.sender_email, self.password)
             
-            print(f"5. Sending email...")
+            print(f"4. Sending email...")
             # Send email
             server.send_message(msg)
-            print(f"6. Closing connection...")
+            print(f"5. Closing connection...")
             server.quit()
             
             print(f"✓ Email sent successfully to {', '.join(self.recipients)}")
-            print(f"  Time: {self.current_time}")
-            print(f"  For: {self.full_title}")
             return True
             
         except Exception as e:
