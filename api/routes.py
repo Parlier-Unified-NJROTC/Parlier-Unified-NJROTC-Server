@@ -19,7 +19,7 @@ def create_app():
             "service": "njrotc-backend"
         })
     
-    @app.route('/signup', methods=['POST', 'OPTIONS'])
+    @app.route('/api/signup', methods=['POST', 'OPTIONS'])
     def handle_signup():
         if request.method == 'OPTIONS':
             return '', 200
@@ -80,7 +80,7 @@ def create_app():
                 "details": str(e)
             }), 500
     
-    @app.route('/suggestion', methods=['POST', 'OPTIONS'])
+    @app.route('/api/suggestion', methods=['POST', 'OPTIONS'])
     def handle_suggestion():
         if request.method == 'OPTIONS':
             return '', 200
