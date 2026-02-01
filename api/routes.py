@@ -4,7 +4,11 @@ import os
 import json
 import subprocess
 import threading
+import sys
 from datetime import datetime
+
+# Add workers directory to path
+sys.path.append('workers')
 
 def create_app():
     app = Flask(__name__)
@@ -22,29 +26,32 @@ def create_app():
             "email_enabled": bool(os.getenv('PYTHON_EMAIL_CURSE'))
         })
     
-    def trigger_email_bot(last_name, rank, selected_items, recipient_email):
-        """Background function to trigger email bot"""
+    def run_email_bot(last_name, rank, selected_items, recipient_email):
+        """Run email bot directly in thread"""
         try:
-            # Build command to run your email bot
-            cmd = [
-                'python', '-c',
-                f'''
-import sys
-sys.path.append(".")
-from workers.gmail_bot import EmailBot
-bot = EmailBot("{last_name}", "{rank}", {json.dumps(selected_items)}, "{recipient_email}")
-success = bot.send_email()
-print("Email send result:", success)
-                '''
-            ]
+            print(f"=== STARTING EMAIL BOT ===")
+            print(f"Recipient: {recipient_email}")
+            print(f"Name: {last_name}")
+            print(f"Rank: {rank}")
+            print(f"Items: {selected_items}")
             
-            # Run in background thread
-            print(f"Attempting to send email to: {recipient_email}")
-            subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            print("Email process started in background")
+            # Import and run email bot directly
+            from workers.gmail_bot import EmailBot
+            
+            bot = EmailBot(last_name, rank, selected_items, recipient_email)
+            success = bot.send_email()
+            
+            if success:
+                print(f"✓ Email sent successfully to {recipient_email}")
+            else:
+                print(f"✗ Failed to send email to {recipient_email}")
+                
+            print(f"=== EMAIL BOT COMPLETE ===")
             
         except Exception as e:
-            print(f"Error triggering email bot: {str(e)}")
+            print(f"ERROR in email bot: {str(e)}")
+            import traceback
+            traceback.print_exc()
     
     @app.route('/api/signup', methods=['POST', 'OPTIONS'])
     def handle_signup():
@@ -68,20 +75,31 @@ print("Email send result:", success)
             last_name = full_name_parts[-1] if full_name_parts else "User"
             
             # Get rank (optional)
-            rank = data.get('rank', '')
+            rank = data.get('rank', 'Cadet')  # Default to 'Cadet' if not specified
             
             # Prepare selected items for email
-            selected_items = ["NJROTC Program Signup Confirmation"]
+            selected_items = [f"NJROTC Program Signup - Grade {data['grade']}"]
             
-            # Trigger email in background thread
+            # Start email in background thread
             email_thread = threading.Thread(
-                target=trigger_email_bot,
+                target=run_email_bot,
                 args=(last_name, rank, selected_items, data['email'])
             )
             email_thread.daemon = True
             email_thread.start()
             
             print(f"Email thread started for: {data['email']}")
+            
+            # Also send to admin if configured
+            admin_email = os.getenv('ADMIN_EMAIL')
+            if admin_email and admin_email != data['email']:
+                admin_thread = threading.Thread(
+                    target=run_email_bot,
+                    args=(last_name, rank, [f"New Signup: {data['fullName']}"], admin_email)
+                )
+                admin_thread.daemon = True
+                admin_thread.start()
+                print(f"Admin notification email triggered to: {admin_email}")
             
             return jsonify({
                 "success": True,
@@ -123,14 +141,14 @@ print("Email send result:", success)
             last_name = full_name_parts[-1] if full_name_parts else "User"
             
             # Prepare email data
-            selected_items = [f"Suggestion: {data['suggestionType']}"]
+            selected_items = [f"Suggestion Type: {data['suggestionType']}", data['suggestionText'][:100] + "..."]
             
             # Get admin email from environment or use default
             admin_email = os.getenv('ADMIN_EMAIL', 'instructor@example.com')
             
             # Trigger email to admin
             email_thread = threading.Thread(
-                target=trigger_email_bot,
+                target=run_email_bot,
                 args=(last_name, "", selected_items, admin_email)
             )
             email_thread.daemon = True
@@ -154,6 +172,36 @@ print("Email send result:", success)
             return jsonify({
                 "error": "Internal server error",
                 "details": str(e)
+            }), 500
+    
+    @app.route('/test-email', methods=['GET'])
+    def test_email():
+        """Test endpoint to verify email sending"""
+        test_email = request.args.get('email', 'saulSanchez.out@gmail.com')
+        
+        try:
+            # Run email test directly
+            from workers.gmail_bot import EmailBot
+            
+            bot = EmailBot(
+                last_name="Test",
+                rank="Cadet",
+                selected_items=["Test Email from Render"],
+                recipient_email=test_email
+            )
+            
+            success = bot.send_email()
+            
+            return jsonify({
+                "success": success,
+                "message": "Test email sent" if success else "Failed to send test email",
+                "recipient": test_email
+            })
+            
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "error": str(e)
             }), 500
     
     return app
