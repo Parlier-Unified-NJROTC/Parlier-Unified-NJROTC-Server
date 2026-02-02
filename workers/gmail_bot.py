@@ -37,7 +37,8 @@ class GmailAPIBot:
         
         self.parsed_data = self.parse_selected_items()
         
-        self.subject = "NJROTC Notification"
+        # Always set subject and body_html based on content type
+        self.subject = "NJROTC Program Signup Confirmation"
         self.body_html = ""
         
         if "Signup" in str(self.selected_items) or "SIGNUP" in str(self.selected_items):
@@ -51,7 +52,9 @@ class GmailAPIBot:
             self.subject = "NJROTC Suggestion Received"
             self.body_html = self.generate_suggestion_email()
         else:
-            self.body_html = self.generate_generic_email()
+            # For any other case, use a clean signup confirmation
+            self.subject = "NJROTC Program Notification"
+            self.body_html = self.generate_clean_notification()
         
         print(f"Email subject: {self.subject}")
         print(f"Recipients: {self.recipients}")
@@ -109,7 +112,7 @@ class GmailAPIBot:
 
         <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background:#0a0a0f; border:2px solid #e6b220; border-radius:12px;">
             <tr>
-                <td style="padding:30px; text-align:center;  color:white;">
+                <td style="padding:30px; text-align:center; color:white;">
                     <h1 style="margin:0; font-size:28px; font-weight:800;">NEW SIGNUP</h1>
                     <p style="margin:10px 0 0; font-size:16px; opacity:0.9;">NJROTC Program • {self.current_time}</p>
                 </td>
@@ -118,20 +121,6 @@ class GmailAPIBot:
             <tr>
                 <td style="padding:25px;">
                     
-                    <div style="text-align:center; padding:15px; border-radius:8px; margin-bottom:25px;">
-                        <h2 style="margin:0; color:white; font-size:24px;">Test</h2>
-                    </div>
-
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
-                        <tr>
-                            <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Full Name</td>
-                        </tr>
-                        <tr>
-                            <td style="font-size:18px; font-weight:600; color:#fafaf5;">{data['full_name']}</td>
-                        </tr>
-                    </table>
-
-
                     <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Student Name</td>
@@ -175,7 +164,7 @@ class GmailAPIBot:
 
                     <p style="margin-top:30px; font-size:12px; color:#aaaaaa; text-align:center;">
                         <strong>Parlier Unified NJROTC Automated Notification</strong><br>
-                        This is an automated message. Please do not reply.<br>
+                        This is an automated message.<br>
                         System generated at {self.current_time}
                     </p>
 
@@ -192,7 +181,7 @@ class GmailAPIBot:
         data = self.parsed_data
         
         return f"""
-        <<html>
+        <html>
         <body style="margin:0; padding:20px; background:#000000; font-family:Segoe UI, Arial, sans-serif; color:#fafaf5;">
 
         <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background:#0a0a0f; border:2px solid #e6b220; border-radius:12px;">
@@ -205,10 +194,6 @@ class GmailAPIBot:
 
             <tr>
                 <td style="padding:25px;">
-
-                    <div style="text-align:center; padding:15px; border-radius:8px; margin-bottom:25px;">
-                        <h2 style="margin:0; color:white; font-size:24px;">Test</h2>
-                    </div>
 
                     <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
@@ -260,7 +245,7 @@ class GmailAPIBot:
 
                     <p style="margin-top:30px; font-size:12px; color:#aaaaaa; text-align:center;">
                         <strong>Parlier Unified NJROTC</strong><br>
-                        This is an automated confirmation message. Please do not reply.<br>
+                        This is an automated confirmation message.<br>
                         For inquiries, contact NJROTC instructor directly.
                     </p>
 
@@ -283,7 +268,7 @@ class GmailAPIBot:
         <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background:#0a0a0f; border:2px solid #3498db; border-radius:12px;">
             <tr>
                 <td style="padding:30px; text-align:center;">
-                    <h1 style="margin:0; font-size:28px; font-weight:800; color:#fafaf5;">New Suggestion Received</h1>
+                    <h1 style="margin:0; font-size:28px; font-weight:800; color:#fafaf5;">Suggestion Received</h1>
                     <p style="margin:10px 0 0; font-size:16px; color:#cccccc;">NJROTC Program • {self.current_time}</p>
                 </td>
             </tr>
@@ -297,15 +282,6 @@ class GmailAPIBot:
                         </tr>
                         <tr>
                             <td style="font-size:18px; font-weight:600; color:#fafaf5;">{data['full_name'] or self.user_last_name}</td>
-                        </tr>
-                    </table>
-
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
-                        <tr>
-                            <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Received</td>
-                        </tr>
-                        <tr>
-                            <td style="font-size:18px; font-weight:600; color:#fafaf5;">{self.current_time}</td>
                         </tr>
                     </table>
 
@@ -332,7 +308,7 @@ class GmailAPIBot:
 
                     <p style="margin-top:30px; font-size:12px; color:#aaaaaa; text-align:center;">
                         <strong>Parlier Unified NJROTC</strong><br>
-                        This is an automated message. Please do not reply.<br>
+                        This is an automated message.<br>
                         For inquiries, contact NJROTC instructor directly.
                     </p>
 
@@ -344,18 +320,44 @@ class GmailAPIBot:
         </html>
         """
     
-    def generate_generic_email(self):
-        """Generate generic notification email"""
-        items_html = "<br>".join([f"• {item}" for item in self.selected_items])
+    def generate_clean_notification(self):
+        """Generate clean notification email without "NJROTC Notification" title"""
+        data = self.parsed_data
+        
         return f"""
         <html>
         <body style="margin:0; padding:20px; background:#000000; font-family:Segoe UI, Arial, sans-serif; color:#fafaf5;">
-        <div style="max-width:600px; margin:0 auto; padding:30px; background:#0a0a0f; border:2px solid #e6b220; border-radius:12px;">
-            <h1 style="color:#fafaf5; text-align:center;">NJROTC Notification</h1>
-            <p><strong>Date:</strong> {self.current_time}</p>
-            <p><strong>Items:</strong></p>
-            <p>{items_html}</p>
-        </div>
+
+        <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background:#0a0a0f; border:2px solid #e6b220; border-radius:12px;">
+            <tr>
+                <td style="padding:30px; text-align:center;">
+                    <h1 style="margin:0; font-size:28px; font-weight:800; color:#fafaf5;">Program Update</h1>
+                    <p style="margin:10px 0 0; font-size:16px; color:#cccccc;">{self.current_time}</p>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding:25px;">
+                    <p style="font-size:16px; line-height:1.6; color:#fafaf5; text-align:center;">
+                        Thank you for your submission. Your information has been received and processed.
+                    </p>
+
+                    <div style="text-align:center; margin-top:40px; padding-top:20px; border-top:1px solid #023c71;">
+                        <h2 style="color:#e6b220; font-size:24px; margin:0;">Parlier Unified NJROTC</h2>
+                        <p style="max-width:500px; margin:10px auto 0; font-size:15px; color:#cccccc;">
+                            We appreciate your participation and will contact you if further action is needed.
+                        </p>
+                    </div>
+
+                    <p style="margin-top:30px; font-size:12px; color:#aaaaaa; text-align:center;">
+                        This is an automated message.<br>
+                        For inquiries, contact NJROTC instructor directly.
+                    </p>
+
+                </td>
+            </tr>
+        </table>
+
         </body>
         </html>
         """
@@ -372,7 +374,7 @@ class GmailAPIBot:
                 creds = Credentials.from_authorized_user_info(token_info, SCOPES)
                 print("✓ Loaded credentials from environment variable")
             except Exception as e:
-                print(f"X Error loading token from env: {e}")
+                print(f"✗ Error loading token from env: {e}")
 
         if not creds or not creds.valid:
             token_file = 'token.pickle'
@@ -382,7 +384,7 @@ class GmailAPIBot:
                     with open(token_file, 'rb') as token:
                         creds = pickle.load(token)
                 except Exception as e:
-                    print(f"X Error loading token file: {e}")
+                    print(f"✗ Error loading token file: {e}")
         
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
@@ -390,10 +392,10 @@ class GmailAPIBot:
                 try:
                     creds.refresh(Request())
                 except Exception as e:
-                    print(f"X Error refreshing credentials: {e}")
+                    print(f"✗ Error refreshing credentials: {e}")
                     return None
             else:
-                print("X No valid credentials found")
+                print("✗ No valid credentials found")
                 return None
         
         return build('gmail', 'v1', credentials=creds)
@@ -415,13 +417,13 @@ class GmailAPIBot:
         print("=== ATTEMPTING TO SEND EMAIL VIA GMAIL API ===")
         
         if not self.recipients:
-            print("X ERROR: No recipient email specified")
+            print("✗ ERROR: No recipient email specified")
             return False
         
         try:
             service = self.authenticate_gmail()
             if not service:
-                print("X ERROR: Failed to authenticate with Gmail API")
+                print("✗ ERROR: Failed to authenticate with Gmail API")
                 print("Tip: You need to generate a token first (see README)")
                 return False
             
@@ -441,10 +443,10 @@ class GmailAPIBot:
             return True
             
         except HttpError as error:
-            print(f"X Gmail API HTTP Error: {error}")
+            print(f"✗ Gmail API HTTP Error: {error}")
             return False
         except Exception as e:
-            print(f"X Error sending email: {type(e).__name__}: {str(e)}")
+            print(f"✗ Error sending email: {type(e).__name__}: {str(e)}")
             import traceback
             traceback.print_exc()
             return False
@@ -472,10 +474,10 @@ def main():
             print("✓ Email process completed successfully")
             return 0
         else:
-            print("X Email process failed")
+            print("✗ Email process failed")
             return 1
     except Exception as e:
-        print(f"X Error: {type(e).__name__}: {str(e)}")
+        print(f"✗ Error: {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()
         return 1
