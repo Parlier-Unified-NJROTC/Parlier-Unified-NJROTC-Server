@@ -200,22 +200,23 @@ def create_app():
         return True, "Valid"
     
     def run_email_bot(last_name, selected_items, recipient_email, extra_data=None):
-        """Run email bot using Gmail API"""
+        """Run email bot using Gmail API - sends BOTH templates to user"""
         try:
-            print(f"=== STARTING EMAIL BOT ===")
+            print(f"=== STARTING EMAIL BOT (USER - BOTH TEMPLATES) ===")
             print(f"Recipient: {recipient_email}")
             
             from workers.gmail_bot import GmailAPIBot
             
             bot = GmailAPIBot(last_name, "", selected_items, recipient_email)
             
+            # Ensure it has both templates (should already be set in __init__)
             if extra_data:
                 bot.extra_data = extra_data
             
             success = bot.send_email()
             
             if success:
-                print(f"✓ Email sent successfully to {recipient_email}")
+                print(f"✓ Email with both templates sent successfully to {recipient_email}")
             else:
                 print(f"✗ Failed to send email to {recipient_email}")
                 
@@ -223,6 +224,41 @@ def create_app():
             
         except Exception as e:
             print(f"ERROR in email bot: {str(e)}")
+            import traceback
+            traceback.print_exc()
+    
+    def run_admin_email_only(last_name, selected_items, recipient_email, extra_data=None):
+        """Run email bot for admin only (sends only admin copy)"""
+        try:
+            print(f"=== STARTING ADMIN-ONLY EMAIL BOT ===")
+            print(f"Admin Recipient: {recipient_email}")
+            
+            from workers.gmail_bot import GmailAPIBot
+            
+            # Create bot but we'll modify it to send only admin copy
+            bot = GmailAPIBot(last_name, "", selected_items, recipient_email)
+            
+            # Override the email_templates to only include admin template
+            bot.email_templates = [{
+                "subject": "NJROTC Program Signup Confirmation (Admin Copy)",
+                "body_html": bot.generate_admin_signup_notification(),
+                "is_admin": True
+            }]
+            
+            if extra_data:
+                bot.extra_data = extra_data
+            
+            success = bot.send_email()
+            
+            if success:
+                print(f"✓ Admin-only email sent successfully to {recipient_email}")
+            else:
+                print(f"✗ Failed to send admin-only email to {recipient_email}")
+                
+            print(f"=== ADMIN-ONLY EMAIL BOT COMPLETE ===")
+            
+        except Exception as e:
+            print(f"ERROR in admin-only email bot: {str(e)}")
             import traceback
             traceback.print_exc()
     
@@ -257,15 +293,32 @@ def create_app():
                     "details": queue_message
                 }), 429
             
+            # Extract last name from full name
             full_name_parts = data['fullName'].strip().split()
             last_name = full_name_parts[-1] if full_name_parts else "Student"
             
-            # STUDENT EMAIL - Use consistent format that matches parser
-            selected_items = [
+            # Create selected_items with student info for USER
+            user_selected_items = [
                 f"Student: {data['fullName']}",
                 f"Grade: {data['grade']}",
                 f"Student ID: {data['schoolId']}",
-                f"Reason for joining: {data['reason']}"
+                f"Reason for joining: {data['reason']}",
+                f"Email: {data['email']}",
+                f"IP Address: {ip_address}",
+                f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                f"NOTE: Student signup - sending both user and admin copies"
+            ]
+            
+            # Create selected_items for ADMIN (actual teacher/admin)
+            admin_selected_items = [
+                f"Student: {data['fullName']}",
+                f"Grade: {data['grade']}",
+                f"Student ID: {data['schoolId']}",
+                f"Reason for joining: {data['reason']}",
+                f"Email: {data['email']}",
+                f"IP Address: {ip_address}",
+                f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                f"NOTE: New student signup notification for admin"
             ]
             
             extra_data = {
@@ -278,38 +331,27 @@ def create_app():
                 'ip_address': ip_address
             }
             
-            # Send to student
-            student_thread = threading.Thread(
+            # Send email to USER - they will get BOTH user confirmation AND admin copy
+            user_email_thread = threading.Thread(
                 target=run_email_bot,
-                args=(data['fullName'], selected_items, data['email'], extra_data)  # Use full name, not just last name
+                args=(last_name, user_selected_items, data['email'], extra_data)
             )
-            student_thread.daemon = True
-            student_thread.start()
+            user_email_thread.daemon = True
+            user_email_thread.start()
             
-            print(f"✓ Student confirmation email queued for: {data['email']}")
+            print(f"✓ User email with BOTH templates queued for: {data['email']}")
             
-            # Send to admin - Use SAME format for consistency
+            # Send separate email to ACTUAL ADMIN/TEACHER (only admin copy)
             admin_email = os.getenv('ADMIN_EMAIL')
-            if admin_email and admin_email != data['email']:
-                # Use the EXACT same format as student email
-                admin_items = [
-                    f"Student: {data['fullName']}",
-                    f"Grade: {data['grade']}",
-                    f"Student ID: {data['schoolId']}",
-                    f"Reason for joining: {data['reason']}",
-                    f"Email: {data['email']}",
-                    f"IP Address: {ip_address}",
-                    f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                    f"NOTE: This is a new signup notification"
-                ]
-                
-                admin_thread = threading.Thread(
-                    target=run_email_bot,
-                    args=(data['fullName'], admin_items, admin_email, extra_data)  # Use full name
+            if admin_email and admin_email.strip():
+                # For actual admin, send only admin copy
+                admin_email_thread = threading.Thread(
+                    target=run_admin_email_only,
+                    args=(last_name, admin_selected_items, admin_email, extra_data)
                 )
-                admin_thread.daemon = True
-                admin_thread.start()
-                print(f"✓ Admin notification email queued for: {admin_email}")
+                admin_email_thread.daemon = True
+                admin_email_thread.start()
+                print(f"✓ Admin notification email queued for actual admin: {admin_email}")
             
             return jsonify({
                 "success": True,
@@ -387,12 +429,14 @@ def create_app():
             
             admin_email = os.getenv('ADMIN_EMAIL')
             
-            email_thread = threading.Thread(
-                target=run_email_bot,
-                args=(last_name, selected_items, admin_email, extra_data)
-            )
-            email_thread.daemon = True
-            email_thread.start()
+            if admin_email and admin_email.strip():
+                email_thread = threading.Thread(
+                    target=run_email_bot,
+                    args=(last_name, selected_items, admin_email, extra_data)
+                )
+                email_thread.daemon = True
+                email_thread.start()
+                print(f"✓ Suggestion email queued for admin: {admin_email}")
             
             return jsonify({
                 "success": True,
