@@ -27,8 +27,9 @@ class GmailAPIBot:
         print(f"Initializing GmailAPIBot for: {recipient_email}")
         
         self.sender_email = os.getenv("SENDER_EMAIL", "njrotcparlier@gmail.com")
-        self.recipient_email = recipient_email
-        self.is_admin_email = recipient_email and ("instructor" in recipient_email.lower() or "admin" in recipient_email.lower())
+        self.recipients = [recipient_email] if recipient_email else []
+        
+        self.is_admin_email = "instructor" in recipient_email.lower() or "admin" in recipient_email.lower()
         
         self.user_last_name = last_name
         self.selected_items = selected_items or []
@@ -39,27 +40,27 @@ class GmailAPIBot:
         self.subject = None
         self.body_html = None
         self.should_send = False
-        
         items_str = str(self.selected_items).lower()
         
         if "signup" in items_str:
-            self.should_send = True
             if self.is_admin_email:
+                self.should_send = True
                 self.subject = "NJROTC Program Signup Confirmation (Admin Copy)"
                 self.body_html = self.generate_admin_signup_notification()
-                self.recipients = [recipient_email]
+                print(f"✓ Will send ADMIN signup notification to: {recipient_email}")
             else:
                 self.should_send = False
-                print(f"! User signup email detected - NOT sending to user")
+                print(f"✗ NOT sending signup email to student: {recipient_email}")
+                print(f"  (Only admins receive signup notifications)")
         elif "suggestion" in items_str:
             self.should_send = True
             self.subject = "NJROTC Suggestion Received"
             self.body_html = self.generate_suggestion_email()
-            self.recipients = [recipient_email]
+            print(f"✓ Will send suggestion email to: {recipient_email}")
         else:
             print(f"! Not sending email - no specific template for items: {self.selected_items}")
             self.should_send = False
-            self.subject = "NJROTC Notification" 
+            self.subject = "NJROTC Notification"  
             self.body_html = None
         
         if self.should_send:
@@ -67,7 +68,7 @@ class GmailAPIBot:
             print(f"Recipients: {self.recipients}")
             print(f"Parsed Data: {self.parsed_data}")
         else:
-            print(f"✗ Will NOT send email - no matching template or user email suppressed")
+            print(f"✗ Will NOT send email - no matching template or not authorized")
     
     def parse_selected_items(self):
         """Parse data from selected items array"""
