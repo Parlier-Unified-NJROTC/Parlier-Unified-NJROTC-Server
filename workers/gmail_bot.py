@@ -29,11 +29,7 @@ class GmailAPIBot:
         self.sender_email = os.getenv("SENDER_EMAIL", "njrotcparlier@gmail.com")
         
         self.recipients = [recipient_email] if recipient_email else []
-        
-        # Admin notification email 
-        admin_email = os.getenv("ADMIN_EMAIL")
-        if admin_email and admin_email not in self.recipients:
-            self.recipients.append(admin_email)
+
         
         self.user_last_name = last_name
         self.selected_items = selected_items or []
