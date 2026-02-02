@@ -742,6 +742,239 @@ def create_app():
                 "error": str(e)
             }), 500
     
+    return appit=10, window=3600):
+                return jsonify({
+                    "error": "Too many signup requests. Please try again later."
+                }), 429
+            
+            queued, queue_message = request_queue.add_request(
+                '/api/signup', 
+                data, 
+                ip_address
+            )
+            
+            if not queued:
+                return jsonify({
+                    "error": "System busy. Please try again later.",
+                    "details": queue_message
+                }), 429
+            
+            # Extract last name from full name
+            full_name_parts = data['fullName'].strip().split()
+            last_name = full_name_parts[-1] if full_name_parts else "Student"
+            
+            # Create selected_items with student info for USER
+            user_selected_items = [
+                f"Student: {data['fullName']}",
+                f"Grade: {data['grade']}",
+                f"Student ID: {data['schoolId']}",
+                f"Reason for joining: {data['reason']}",
+                f"Email: {data['email']}",
+                f"IP Address: {ip_address}",
+                f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                f"NOTE: Student signup - sending both user and admin copies"
+            ]
+            
+            # Create selected_items for ADMIN (actual teacher/admin)
+            admin_selected_items = [
+                f"Student: {data['fullName']}",
+                f"Grade: {data['grade']}",
+                f"Student ID: {data['schoolId']}",
+                f"Reason for joining: {data['reason']}",
+                f"Email: {data['email']}",
+                f"IP Address: {ip_address}",
+                f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                f"NOTE: New student signup notification for admin"
+            ]
+            
+            extra_data = {
+                'full_name': data['fullName'],
+                'school_id': data['schoolId'],
+                'grade': data['grade'],
+                'email': data['email'],
+                'reason': data['reason'],
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'ip_address': ip_address
+            }
+            
+            # Send email to USER - they will get BOTH user confirmation AND admin copy
+            user_email_thread = threading.Thread(
+                target=run_email_bot,
+                args=(last_name, user_selected_items, data['email'], extra_data)
+            )
+            user_email_thread.daemon = True
+            user_email_thread.start()
+            
+            print(f"✓ User email with BOTH templates queued for: {data['email']}")
+            
+            # Send separate email to ACTUAL ADMIN/TEACHER (only admin copy)
+            admin_email = os.getenv('ADMIN_EMAIL')
+            if admin_email and admin_email.strip():
+                # For actual admin, send only admin copy
+                admin_email_thread = threading.Thread(
+                    target=run_admin_email_only,
+                    args=(last_name, admin_selected_items, admin_email, extra_data)
+                )
+                admin_email_thread.daemon = True
+                admin_email_thread.start()
+                print(f"✓ Admin notification email queued for actual admin: {admin_email}")
+            
+            return jsonify({
+                "success": True,
+                "message": "Signup received successfully",
+                "email_triggered": True,
+                "queue_position": request_queue.queue.qsize(),
+                "data": {
+                    "name": data['fullName'],
+                    "email": data['email'],
+                    "timestamp": datetime.now().isoformat()
+                }
+            }), 200
+            
+        except Exception as e:
+            print(f"Error processing signup from {ip_address}: {str(e)}")
+            return jsonify({
+                "error": "Internal server error",
+                "details": "Please try again later"
+            }), 500
+    
+    @app.route('/api/suggestion', methods=['POST', 'OPTIONS'])
+    def handle_suggestion():
+        if request.method == 'OPTIONS':
+            return '', 200
+        
+        ip_address = request.remote_addr
+        
+        try:
+            data = request.json
+            
+            required_fields = ['fullName', 'suggestionType', 'suggestionText']
+            for field in required_fields:
+                if field not in data or not data[field]:
+                    return jsonify({
+                        "error": f"Missing required field: {field}"
+                    }), 400
+            
+            if not rate_limiter.check_limit(ip_address, limit=400, window=600):
+                return jsonify({
+                    "error": "Too many suggestion requests. Please try again later."
+                }), 429
+            
+            if len(data['suggestionText']) > 2000:
+                return jsonify({
+                    "error": "Suggestion text too long (max 2000 characters)"
+                }), 400
+            
+            queued, queue_message = request_queue.add_request(
+                '/api/suggestion', 
+                data, 
+                ip_address
+            )
+            
+            if not queued:
+                return jsonify({
+                    "error": "System busy. Please try again later.",
+                    "details": queue_message
+                }), 429
+            
+            full_name_parts = data['fullName'].strip().split()
+            last_name = full_name_parts[-1] if full_name_parts else "User"
+            
+            selected_items = [
+                f"Suggestion Type: {data['suggestionType']}",
+                f"Suggestion: {data['suggestionText'][:500]}..."
+            ]
+            
+            extra_data = {
+                'full_name': data['fullName'],
+                'suggestion_type': data['suggestionType'],
+                'suggestion_text': data['suggestionText'],
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                'ip_address': ip_address
+            }
+            
+            admin_email = os.getenv('ADMIN_EMAIL')
+            
+            if admin_email and admin_email.strip():
+                email_thread = threading.Thread(
+                    target=run_email_bot,
+                    args=(last_name, selected_items, admin_email, extra_data)
+                )
+                email_thread.daemon = True
+                email_thread.start()
+                print(f"✓ Suggestion email queued for admin: {admin_email}")
+            
+            return jsonify({
+                "success": True,
+                "message": "Suggestion submitted successfully",
+                "email_triggered": True,
+                "queue_position": request_queue.queue.qsize(),
+                "data": {
+                    "name": data['fullName'],
+                    "type": data['suggestionType'],
+                    "timestamp": datetime.now().isoformat()
+                }
+            }), 200
+            
+        except Exception as e:
+            print(f"Error processing suggestion from {ip_address}: {str(e)}")
+            return jsonify({
+                "error": "Internal server error",
+                "details": "Please try again later"
+            }), 500
+    
+    @app.route('/api/queue-status', methods=['GET'])
+    def queue_status():
+        """Endpoint to check queue status (for monitoring)"""
+        auth = request.headers.get('Authorization')
+        if not auth or not auth.startswith('Basic '):
+            return jsonify({"error": "Unauthorized"}), 401
+        
+        return jsonify({
+            "queue_size": request_queue.queue.qsize(),
+            "max_queue_size": request_queue.queue.maxsize,
+            "timestamp": datetime.now().isoformat()
+        })
+    
+    @app.route('/test-email', methods=['GET'])
+    def test_email():
+        """Test endpoint to verify email sending"""
+        auth = request.headers.get('Authorization')
+        if not auth or not auth.startswith('Basic '):
+            return jsonify({"error": "Unauthorized"}), 401
+        
+        test_email = request.args.get('email', 'saulSanchez.out@gmail.com')
+
+        if '@' not in test_email or '.' not in test_email:
+            return jsonify({
+                "success": False,
+                "error": "Invalid email format"
+            }), 400
+        
+        try:
+            from workers.gmail_bot import GmailAPIBot
+            
+            bot = GmailAPIBot(
+                last_name="Test",
+                rank="",
+                selected_items=["Test Email from NJROTC Website"],
+                recipient_email=test_email
+            )
+            
+            success = bot.send_email()
+            
+            return jsonify({
+                "success": success,
+                "message": "Test email sent" if success else "Failed to send test email",
+                "recipient": test_email
+            })
+            
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            }), 500
+    
     return appreason'],
                 'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 'ip_address': ip_address
