@@ -27,6 +27,7 @@ class GmailAPIBot:
         print(f"Initializing GmailAPIBot for: {recipient_email}")
         
         self.sender_email = os.getenv("SENDER_EMAIL", "njrotcparlier@gmail.com")
+        
         self.recipients = [recipient_email] if recipient_email else []
         
         
