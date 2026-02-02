@@ -29,9 +29,7 @@ class GmailAPIBot:
         self.sender_email = os.getenv("SENDER_EMAIL", "njrotcparlier@gmail.com")
         self.recipients = [recipient_email] if recipient_email else []
         
-        
-        self.send_admin_copy = True  
-        self.send_user_copy = True
+        self.is_admin_email = "instructor" in recipient_email.lower() or "admin" in recipient_email.lower()
         
         self.user_last_name = last_name
         self.selected_items = selected_items or []
@@ -39,43 +37,38 @@ class GmailAPIBot:
         
         self.parsed_data = self.parse_selected_items()
         
+        self.subject = None
+        self.body_html = None
         self.should_send = False
-        self.email_templates = []  
-        
         items_str = str(self.selected_items).lower()
         
         if "signup" in items_str:
-            self.should_send = True
-            self.email_templates.append({
-                "subject": "NJROTC Program Signup Confirmation (Admin Copy)",
-                "body_html": self.generate_admin_signup_notification(),
-                "is_admin": True
-            })
-            self.email_templates.append({
-                "subject": "NJROTC Program Signup Confirmation",
-                "body_html": self.generate_signup_confirmation(),
-                "is_admin": False
-            })
-            print(f"✓ Will send BOTH admin and user emails to: {recipient_email}")
-            
+            if self.is_admin_email:
+                self.should_send = True
+                self.subject = "NJROTC Program Signup Confirmation (Admin Copy)"
+                self.body_html = self.generate_admin_signup_notification()
+                print(f"✓ Will send ADMIN signup notification to: {recipient_email}")
+            else:
+                self.should_send = False
+                print(f"✗ NOT sending signup email to student: {recipient_email}")
+                print(f"  (Only admins receive signup notifications)")
         elif "suggestion" in items_str:
             self.should_send = True
-            self.email_templates.append({
-                "subject": "NJROTC Suggestion Received",
-                "body_html": self.generate_suggestion_email(),
-                "is_admin": True  
-            })
+            self.subject = "NJROTC Suggestion Received"
+            self.body_html = self.generate_suggestion_email()
             print(f"✓ Will send suggestion email to: {recipient_email}")
         else:
             print(f"! Not sending email - no specific template for items: {self.selected_items}")
             self.should_send = False
+            self.subject = "NJROTC Notification"  
+            self.body_html = None
         
         if self.should_send:
-            print(f"✓ Will send {len(self.email_templates)} email(s)")
+            print(f"✓ Will send email with subject: {self.subject}")
             print(f"Recipients: {self.recipients}")
             print(f"Parsed Data: {self.parsed_data}")
         else:
-            print(f"✗ Will NOT send email - no matching template")
+            print(f"✗ Will NOT send email - no matching template or not authorized")
     
     def parse_selected_items(self):
         """Parse data from selected items array"""
@@ -391,13 +384,28 @@ class GmailAPIBot:
         
         return build('gmail', 'v1', credentials=creds)
     
+    def create_message(self):
+        """Create a MIME message"""
+        if not self.should_send or not self.body_html:
+            return None
+            
+        message = MIMEMultipart('alternative')
+        message['to'] = ', '.join(self.recipients)
+        message['from'] = self.sender_email
+        message['subject'] = self.subject
+        
+        message.attach(MIMEText(self.body_html, 'html'))
+        
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        return {'raw': raw_message}
+    
     def send_email(self):
-        """Send email(s) using Gmail API"""
-        print("=== ATTEMPTING TO SEND EMAIL(S) VIA GMAIL API ===")
+        """Send email using Gmail API"""
+        print("=== ATTEMPTING TO SEND EMAIL VIA GMAIL API ===")
         
         if not self.should_send:
             print("! Skipping email - no matching template for items")
-            return True
+            return True  # Return True to indicate "no error, just skipped"
         
         if not self.recipients:
             print("✗ ERROR: No recipient email specified")
@@ -410,42 +418,25 @@ class GmailAPIBot:
                 print("Tip: You need to generate a token first (see README)")
                 return False
             
-            success_count = 0
-            
-            for template in self.email_templates:
-                message = MIMEMultipart('alternative')
-                message['to'] = ', '.join(self.recipients)
-                message['from'] = self.sender_email
-                message['subject'] = template["subject"]
-                message.attach(MIMEText(template["body_html"], 'html'))
-                
-                raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-                
-                print(f"Sending {template['subject']} to: {self.recipients}")
-                
-                try:
-                    sent_message = service.users().messages().send(
-                        userId='me', 
-                        body={'raw': raw_message}
-                    ).execute()
-                    
-                    print(f"✓ Email sent: {template['subject']}")
-                    print(f"  Message ID: {sent_message['id']}")
-                    success_count += 1
-                    
-                except Exception as e:
-                    print(f"✗ Failed to send {template['subject']}: {e}")
-            
-            if success_count == len(self.email_templates):
-                print(f"✓ All {success_count} email(s) sent successfully")
+            message = self.create_message()
+            if not message:
+                print("! No message to send")
                 return True
-            elif success_count > 0:
-                print(f"! {success_count}/{len(self.email_templates)} email(s) sent")
-                return True
-            else:
-                print("✗ No emails were sent successfully")
-                return False
-                
+            
+            print(f"Sending email to: {self.recipients}")
+            
+            sent_message = service.users().messages().send(
+                userId='me', 
+                body=message
+            ).execute()
+            
+            print(f"✓ Email sent successfully via Gmail API")
+            print(f"Message ID: {sent_message['id']}")
+            print(f"To: {', '.join(self.recipients)}")
+            print(f"Subject: {self.subject}")
+            
+            return True
+            
         except HttpError as error:
             print(f"✗ Gmail API HTTP Error: {error}")
             return False
