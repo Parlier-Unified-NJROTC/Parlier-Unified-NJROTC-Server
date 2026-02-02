@@ -48,10 +48,10 @@ class GmailAPIBot:
     def generate_signup_confirmation(self):
         """Generate signup confirmation email matching website fundraising style"""
         # Extract info from selected items
-        full_name = "Student"
-        grade = "N/A"
-        student_id = "N/A"
-        reason = "Not provided"
+        full_name = ""
+        grade = ""
+        student_id = ""
+        reason = ""
         
         for item in self.selected_items:
             if "Student:" in item:

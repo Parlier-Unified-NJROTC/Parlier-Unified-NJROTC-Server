@@ -339,7 +339,7 @@ def create_app():
                         "error": f"Missing required field: {field}"
                     }), 400
             
-            if not rate_limiter.check_limit(ip_address, limit=100, window=600):
+            if not rate_limiter.check_limit(ip_address, limit=400, window=600):
                 return jsonify({
                     "error": "Too many suggestion requests. Please try again later."
                 }), 429
