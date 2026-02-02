@@ -257,15 +257,19 @@ def create_app():
                     "details": queue_message
                 }), 429
             
+            # Extract last name from full name
             full_name_parts = data['fullName'].strip().split()
             last_name = full_name_parts[-1] if full_name_parts else "Student"
             
-            # STUDENT EMAIL - Use consistent format that matches parser
+            # Create selected_items with student info
             selected_items = [
                 f"Student: {data['fullName']}",
                 f"Grade: {data['grade']}",
                 f"Student ID: {data['schoolId']}",
-                f"Reason for joining: {data['reason']}"
+                f"Reason for joining: {data['reason']}",
+                f"Email: {data['email']}",
+                f"IP Address: {ip_address}",
+                f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             ]
             
             extra_data = {
@@ -278,38 +282,27 @@ def create_app():
                 'ip_address': ip_address
             }
             
-            # Send to student
-            student_thread = threading.Thread(
+            # Only send ONE email to the user (which will include both admin and user templates)
+            email_thread = threading.Thread(
                 target=run_email_bot,
-                args=(data['fullName'], selected_items, data['email'], extra_data)  # Use full name, not just last name
+                args=(last_name, selected_items, data['email'], extra_data)
             )
-            student_thread.daemon = True
-            student_thread.start()
+            email_thread.daemon = True
+            email_thread.start()
             
-            print(f"✓ Student confirmation email queued for: {data['email']}")
+            print(f"✓ Email queued for: {data['email']}")
             
-            # Send to admin - Use SAME format for consistency
+            # Check if we need to also send to a separate admin email
             admin_email = os.getenv('ADMIN_EMAIL')
             if admin_email and admin_email != data['email']:
-                # Use the EXACT same format as student email
-                admin_items = [
-                    f"Student: {data['fullName']}",
-                    f"Grade: {data['grade']}",
-                    f"Student ID: {data['schoolId']}",
-                    f"Reason for joining: {data['reason']}",
-                    f"Email: {data['email']}",
-                    f"IP Address: {ip_address}",
-                    f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                    f"NOTE: This is a new signup notification"
-                ]
-                
+                # Send a separate email to admin if it's a different address
                 admin_thread = threading.Thread(
                     target=run_email_bot,
-                    args=(data['fullName'], admin_items, admin_email, extra_data)  # Use full name
+                    args=(last_name, selected_items, admin_email, extra_data)
                 )
                 admin_thread.daemon = True
                 admin_thread.start()
-                print(f"✓ Admin notification email queued for: {admin_email}")
+                print(f"✓ Additional admin notification email queued for: {admin_email}")
             
             return jsonify({
                 "success": True,
