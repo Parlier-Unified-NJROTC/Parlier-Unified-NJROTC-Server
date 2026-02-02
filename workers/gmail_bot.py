@@ -29,46 +29,39 @@ class GmailAPIBot:
         self.sender_email = os.getenv("SENDER_EMAIL", "njrotcparlier@gmail.com")
         self.recipients = [recipient_email] if recipient_email else []
         
+        # Track if this is an admin email (different template)
         self.is_admin_email = "instructor" in recipient_email.lower() or "admin" in recipient_email.lower()
         
         self.user_last_name = last_name
         self.selected_items = selected_items or []
         self.current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
+        # Parse data from selected items
         self.parsed_data = self.parse_selected_items()
         
-        self.subject = None
-        self.body_html = None
-        self.should_send = False
-        items_str = str(self.selected_items).lower()
+        # Set default subject to prevent AttributeError
+        self.subject = "NJROTC Notification"
+        self.body_html = ""
         
-        if "signup" in items_str:
+        # Determine email type
+        if "Signup" in str(self.selected_items) or "SIGNUP" in str(self.selected_items):
             if self.is_admin_email:
-                self.should_send = True
-                self.subject = "NJROTC Program Signup Confirmation (Admin Copy)"
+                self.subject = "🚨 NEW NJROTC Signup Notification"
                 self.body_html = self.generate_admin_signup_notification()
-                print(f"✓ Will send ADMIN signup notification to: {recipient_email}")
             else:
-                self.should_send = False
-                print(f"✗ NOT sending signup email to student: {recipient_email}")
-                print(f"  (Only admins receive signup notifications)")
-        elif "suggestion" in items_str:
-            self.should_send = True
+                self.subject = "NJROTC Program Signup Confirmation"
+                self.body_html = self.generate_signup_confirmation()
+        elif "Suggestion" in str(self.selected_items):
             self.subject = "NJROTC Suggestion Received"
             self.body_html = self.generate_suggestion_email()
-            print(f"✓ Will send suggestion email to: {recipient_email}")
         else:
-            print(f"! Not sending email - no specific template for items: {self.selected_items}")
-            self.should_send = False
-            self.subject = "NJROTC Notification"  
-            self.body_html = None
+            # Fallback generic email
+            self.body_html = self.generate_generic_email()
         
-        if self.should_send:
-            print(f"✓ Will send email with subject: {self.subject}")
-            print(f"Recipients: {self.recipients}")
-            print(f"Parsed Data: {self.parsed_data}")
-        else:
-            print(f"✗ Will NOT send email - no matching template or not authorized")
+        print(f"Email subject: {self.subject}")
+        print(f"Recipients: {self.recipients}")
+        print(f"Is Admin Email: {self.is_admin_email}")
+        print(f"Parsed Data: {self.parsed_data}")
     
     def parse_selected_items(self):
         """Parse data from selected items array"""
@@ -106,6 +99,7 @@ class GmailAPIBot:
             elif "Suggestion:" in item_str:
                 data['suggestion_text'] = item_str.split(":", 1)[1].strip()
         
+        # If full_name not found but we have last name, use it
         if not data['full_name'] and self.user_last_name:
             data['full_name'] = self.user_last_name
         
@@ -117,24 +111,20 @@ class GmailAPIBot:
         
         return f"""
         <html>
-        <body style="margin:0; padding:20px; font-family:Segoe UI, Arial, sans-serif; color:#fafaf5;">
+        <body style="margin:0; padding:20px; background:#000000; font-family:Segoe UI, Arial, sans-serif; color:#fafaf5;">
 
-        <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background:#0a0a0f; border:2px solid #e6b220; border-radius:12px;">
+        <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background:#0a0a0f; border:2px solid #e74c3c; border-radius:12px;">
             <tr>
-                <td style="padding:30px; text-align:center;  color:white;">
-                    <h1 style="margin:0; font-size:28px; font-weight:800;">NJROTC Program Signup</h1>
-                    <p style="margin:10px 0 0; font-size:16px; opacity:0.9;">Parlier NJROTC Program • {self.current_time}</p>
+                <td style="padding:30px; text-align:center; background:#e74c3c; color:white;">
+                    <h1 style="margin:0; font-size:28px; font-weight:800;">🚨 NEW SIGNUP RECEIVED</h1>
+                    <p style="margin:10px 0 0; font-size:16px; opacity:0.9;">NJROTC Program • {self.current_time}</p>
                 </td>
             </tr>
 
             <tr>
                 <td style="padding:25px;">
-                    
-                    <div style="text-align:center; padding:15px; border-radius:8px; margin-bottom:25px;">
-                        <h2 style="margin:0; color:white; font-size:24px;">Test</h2>
-                    </div>
 
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #e6b220; border-radius:12px; margin-bottom:15px;">
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Student Name</td>
                         </tr>
@@ -143,7 +133,7 @@ class GmailAPIBot:
                         </tr>
                     </table>
 
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #e6b220; border-radius:12px; margin-bottom:15px;">
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Grade Level</td>
                         </tr>
@@ -152,7 +142,7 @@ class GmailAPIBot:
                         </tr>
                     </table>
 
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #e6b220; border-radius:12px; margin-bottom:15px;">
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Student ID</td>
                         </tr>
@@ -161,7 +151,7 @@ class GmailAPIBot:
                         </tr>
                     </table>
 
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #e6b220; border-radius:12px; margin-bottom:15px;">
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Contact Email</td>
                         </tr>
@@ -173,6 +163,26 @@ class GmailAPIBot:
                     <h3 style="margin-top:30px; color:#e6b220; font-size:18px;">Student's Reason for Joining</h3>
                     <div style="background:#001a33; border-left:4px solid #e6b220; padding:15px; border-radius:6px; margin-bottom:20px;">
                         <p style="margin:0; font-size:16px; font-style:italic; color:#fafaf5;">"{data['reason']}"</p>
+                    </div>
+
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #666; border-radius:12px; margin-bottom:20px;">
+                        <tr>
+                            <td style="color:#999; font-size:11px; text-transform:uppercase;">Technical Details</td>
+                        </tr>
+                        <tr>
+                            <td style="font-size:12px; color:#ccc;">
+                                IP Address: {data['ip_address'] or 'N/A'}<br>
+                                Submitted: {data['timestamp']}<br>
+                                Auto-generated by NJROTC Website
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div style="text-align:center; margin-top:40px; padding-top:20px; border-top:1px solid #023c71;">
+                        <h2 style="color:#e6b220; font-size:24px; margin:0;">Action Required</h2>
+                        <p style="max-width:500px; margin:10px auto 0; font-size:15px; color:#cccccc;">
+                            Please follow up with this student within 3 business days to complete their enrollment process.
+                        </p>
                     </div>
 
                     <p style="margin-top:30px; font-size:12px; color:#aaaaaa; text-align:center;">
@@ -195,7 +205,7 @@ class GmailAPIBot:
         
         return f"""
         <html>
-        <body style="margin:0; padding:20px; font-family:Segoe UI, Arial, sans-serif; color:#fafaf5;">
+        <body style="margin:0; padding:20px; background:#000000; font-family:Segoe UI, Arial, sans-serif; color:#fafaf5;">
 
         <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background:#0a0a0f; border:2px solid #e6b220; border-radius:12px;">
             <tr>
@@ -208,11 +218,11 @@ class GmailAPIBot:
             <tr>
                 <td style="padding:25px;">
 
-                    <div style="text-align:center; padding:15px; border-radius:8px; margin-bottom:25px;">
-                        <h2 style="margin:0; color:white; font-size:24px;">Test</h2>
+                    <div style="text-align:center; background:#2ecc71; padding:15px; border-radius:8px; margin-bottom:25px;">
+                        <h2 style="margin:0; color:white; font-size:24px;">✓ Application Confirmed</h2>
                     </div>
 
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #e6b220; border-radius:12px; margin-bottom:15px;">
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Full Name</td>
                         </tr>
@@ -221,7 +231,7 @@ class GmailAPIBot:
                         </tr>
                     </table>
 
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #e6b220; border-radius:12px; margin-bottom:15px;">
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Grade Level</td>
                         </tr>
@@ -230,7 +240,7 @@ class GmailAPIBot:
                         </tr>
                     </table>
 
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #e6b220; border-radius:12px; margin-bottom:15px;">
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Student ID</td>
                         </tr>
@@ -239,7 +249,7 @@ class GmailAPIBot:
                         </tr>
                     </table>
 
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #e6b220; border-radius:12px; margin-bottom:15px;">
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Submission Date</td>
                         </tr>
@@ -253,10 +263,20 @@ class GmailAPIBot:
                         <p style="margin:0; font-size:16px; font-style:italic; color:#fafaf5;">"{data['reason']}"</p>
                     </div>
 
+                    <div style="background:#1a472a; padding:15px; border-radius:8px; margin:25px 0;">
+                        <h4 style="margin:0 0 10px 0; color:#2ecc71; font-size:16px;">📋 Next Steps</h4>
+                        <ul style="margin:0; padding-left:20px; color:#fafaf5; font-size:14px;">
+                            <li>You will receive follow-up information within 3-5 business days</li>
+                            <li>Prepare necessary documentation (ID, physical forms, etc.)</li>
+                            <li>Attend the next scheduled orientation session</li>
+                            <li>Contact your instructor if you have immediate questions</li>
+                        </ul>
+                    </div>
+
                     <div style="text-align:center; margin-top:40px; padding-top:20px; border-top:1px solid #023c71;">
                         <h2 style="color:#e6b220; font-size:24px; margin:0;">Thank You</h2>
                         <p style="max-width:500px; margin:10px auto 0; font-size:15px; color:#cccccc;">
-                            We appreciate your interest in the NJROTC program. Your enthusiasm and commitment strengthen our unit. We look forward to welcoming you to our unit.
+                            We appreciate your interest in the NJROTC program. Your enthusiasm and commitment strengthen our unit. We look forward to welcoming you to our cadet family.
                         </p>
                     </div>
 
@@ -280,12 +300,12 @@ class GmailAPIBot:
         
         return f"""
         <html>
-        <body style="margin:0; padding:20px; font-family:Segoe UI, Arial, sans-serif; color:#fafaf5;">
+        <body style="margin:0; padding:20px; background:#000000; font-family:Segoe UI, Arial, sans-serif; color:#fafaf5;">
 
-        <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background:#0a0a0f; border:2px solid #e6b220; border-radius:12px;">
+        <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background:#0a0a0f; border:2px solid #3498db; border-radius:12px;">
             <tr>
                 <td style="padding:30px; text-align:center;">
-                    <h1 style="margin:0; font-size:28px; font-weight:800; color:#fafaf5;">Suggestion Received</h1>
+                    <h1 style="margin:0; font-size:28px; font-weight:800; color:#fafaf5;">New Suggestion Received</h1>
                     <p style="margin:10px 0 0; font-size:16px; color:#cccccc;">NJROTC Program • {self.current_time}</p>
                 </td>
             </tr>
@@ -293,7 +313,7 @@ class GmailAPIBot:
             <tr>
                 <td style="padding:25px;">
 
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #e6b220; border-radius:12px; margin-bottom:15px;">
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">From</td>
                         </tr>
@@ -302,7 +322,7 @@ class GmailAPIBot:
                         </tr>
                     </table>
 
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #e6b220; border-radius:12px; margin-bottom:15px;">
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Received</td>
                         </tr>
@@ -311,7 +331,7 @@ class GmailAPIBot:
                         </tr>
                     </table>
 
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #e6b220; border-radius:12px; margin-bottom:15px;">
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Suggestion Type</td>
                         </tr>
@@ -335,13 +355,29 @@ class GmailAPIBot:
                     <p style="margin-top:30px; font-size:12px; color:#aaaaaa; text-align:center;">
                         <strong>Parlier Unified NJROTC</strong><br>
                         This is an automated message. Please do not reply.<br>
-                        For inquiries, contact Your leadership directly.
+                        For inquiries, contact NJROTC instructor directly.
                     </p>
 
                 </td>
             </tr>
         </table>
 
+        </body>
+        </html>
+        """
+    
+    def generate_generic_email(self):
+        """Generate generic notification email"""
+        items_html = "<br>".join([f"• {item}" for item in self.selected_items])
+        return f"""
+        <html>
+        <body style="margin:0; padding:20px; background:#000000; font-family:Segoe UI, Arial, sans-serif; color:#fafaf5;">
+        <div style="max-width:600px; margin:0 auto; padding:30px; background:#0a0a0f; border:2px solid #e6b220; border-radius:12px;">
+            <h1 style="color:#fafaf5; text-align:center;">NJROTC Notification</h1>
+            <p><strong>Date:</strong> {self.current_time}</p>
+            <p><strong>Items:</strong></p>
+            <p>{items_html}</p>
+        </div>
         </body>
         </html>
         """
@@ -386,9 +422,6 @@ class GmailAPIBot:
     
     def create_message(self):
         """Create a MIME message"""
-        if not self.should_send or not self.body_html:
-            return None
-            
         message = MIMEMultipart('alternative')
         message['to'] = ', '.join(self.recipients)
         message['from'] = self.sender_email
@@ -403,10 +436,6 @@ class GmailAPIBot:
         """Send email using Gmail API"""
         print("=== ATTEMPTING TO SEND EMAIL VIA GMAIL API ===")
         
-        if not self.should_send:
-            print("! Skipping email - no matching template for items")
-            return True  # Return True to indicate "no error, just skipped"
-        
         if not self.recipients:
             print("✗ ERROR: No recipient email specified")
             return False
@@ -415,15 +444,11 @@ class GmailAPIBot:
             service = self.authenticate_gmail()
             if not service:
                 print("✗ ERROR: Failed to authenticate with Gmail API")
-                print("Tip: You need to generate a token first (see README)")
+                print("💡 Tip: You need to generate a token first (see README)")
                 return False
             
             message = self.create_message()
-            if not message:
-                print("! No message to send")
-                return True
-            
-            print(f"Sending email to: {self.recipients}")
+            print(f"📧 Sending email to: {self.recipients}")
             
             sent_message = service.users().messages().send(
                 userId='me', 
@@ -431,9 +456,9 @@ class GmailAPIBot:
             ).execute()
             
             print(f"✓ Email sent successfully via Gmail API")
-            print(f"Message ID: {sent_message['id']}")
-            print(f"To: {', '.join(self.recipients)}")
-            print(f"Subject: {self.subject}")
+            print(f"  📨 Message ID: {sent_message['id']}")
+            print(f"  👤 To: {', '.join(self.recipients)}")
+            print(f"  🏷️ Subject: {self.subject}")
             
             return True
             
