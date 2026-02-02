@@ -240,7 +240,7 @@ def create_app():
             if not is_valid:
                 return jsonify({"error": message}), 400
             
-            if not rate_limiter.check_limit(ip_address, limit=10, window=3600):  # 10/hour
+            if not rate_limiter.check_limit(ip_address, limit=10, window=3600):
                 return jsonify({
                     "error": "Too many signup requests. Please try again later."
                 }), 429
@@ -260,11 +260,12 @@ def create_app():
             full_name_parts = data['fullName'].strip().split()
             last_name = full_name_parts[-1] if full_name_parts else "Student"
             
+            # STUDENT EMAIL - Use consistent format that matches parser
             selected_items = [
-                f"NJROTC Program Signup",
+                f"Student: {data['fullName']}",
                 f"Grade: {data['grade']}",
                 f"Student ID: {data['schoolId']}",
-                f"Reason for joining: {data['reason'][:200]}..."
+                f"Reason for joining: {data['reason']}"
             ]
             
             extra_data = {
@@ -277,31 +278,38 @@ def create_app():
                 'ip_address': ip_address
             }
             
+            # Send to student
             student_thread = threading.Thread(
                 target=run_email_bot,
-                args=(last_name, selected_items, data['email'], extra_data)
+                args=(data['fullName'], selected_items, data['email'], extra_data)  # Use full name, not just last name
             )
             student_thread.daemon = True
             student_thread.start()
             
+            print(f"✓ Student confirmation email queued for: {data['email']}")
+            
+            # Send to admin - Use SAME format for consistency
             admin_email = os.getenv('ADMIN_EMAIL')
             if admin_email and admin_email != data['email']:
+                # Use the EXACT same format as student email
                 admin_items = [
-                    f"NEW SIGNUP RECEIVED",
                     f"Student: {data['fullName']}",
                     f"Grade: {data['grade']}",
                     f"Student ID: {data['schoolId']}",
+                    f"Reason for joining: {data['reason']}",
                     f"Email: {data['email']}",
-                    f"Reason: {data['reason'][:150]}...",
-                    f"IP Address: {ip_address}"
+                    f"IP Address: {ip_address}",
+                    f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                    f"NOTE: This is a new signup notification"
                 ]
                 
                 admin_thread = threading.Thread(
                     target=run_email_bot,
-                    args=(last_name, admin_items, admin_email, extra_data)
+                    args=(data['fullName'], admin_items, admin_email, extra_data)  # Use full name
                 )
                 admin_thread.daemon = True
                 admin_thread.start()
+                print(f"✓ Admin notification email queued for: {admin_email}")
             
             return jsonify({
                 "success": True,

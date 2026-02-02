@@ -29,39 +29,166 @@ class GmailAPIBot:
         self.sender_email = os.getenv("SENDER_EMAIL", "njrotcparlier@gmail.com")
         
         self.recipients = [recipient_email] if recipient_email else []
-
+        
+        # Track if this is an admin email (different template)
+        self.is_admin_email = "instructor" in recipient_email.lower() or "admin" in recipient_email.lower()
         
         self.user_last_name = last_name
         self.selected_items = selected_items or []
         self.current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
+        # Parse data from selected items
+        self.parsed_data = self.parse_selected_items()
+        
         if "Signup" in str(self.selected_items) or "SIGNUP" in str(self.selected_items):
-            self.subject = "NJROTC Program Signup Confirmation"
-            self.body_html = self.generate_signup_confirmation()
+            if self.is_admin_email:
+                self.subject = "🚨 NEW NJROTC Signup Notification"
+                self.body_html = self.generate_admin_signup_notification()
+            else:
+                self.subject = "NJROTC Program Signup Confirmation"
+                self.body_html = self.generate_signup_confirmation()
         elif "Suggestion" in str(self.selected_items):
             self.subject = "NJROTC Suggestion Received"
             self.body_html = self.generate_suggestion_email()
         
         print(f"Email subject: {self.subject}")
         print(f"Recipients: {self.recipients}")
+        print(f"Is Admin Email: {self.is_admin_email}")
+        print(f"Parsed Data: {self.parsed_data}")
     
-    def generate_signup_confirmation(self):
-        """Generate signup confirmation email matching website fundraising style"""
-        # Extract info from selected items
-        full_name = ""
-        grade = ""
-        student_id = ""
-        reason = ""
+    def parse_selected_items(self):
+        """Parse data from selected items array"""
+        data = {
+            'full_name': '',
+            'grade': '',
+            'student_id': '',
+            'reason': '',
+            'email': '',
+            'ip_address': '',
+            'timestamp': self.current_time,
+            'note': ''
+        }
         
         for item in self.selected_items:
-            if "Student:" in item:
-                full_name = item.split(":", 1)[1].strip()
-            elif "Grade:" in item:
-                grade = item.split(":", 1)[1].strip()
-            elif "Student ID:" in item:
-                student_id = item.split(":", 1)[1].strip()
-            elif "Reason for joining:" in item:
-                reason = item.split(":", 1)[1].strip()
+            item_str = str(item)
+            if "Student:" in item_str:
+                data['full_name'] = item_str.split(":", 1)[1].strip()
+            elif "Grade:" in item_str:
+                data['grade'] = item_str.split(":", 1)[1].strip()
+            elif "Student ID:" in item_str:
+                data['student_id'] = item_str.split(":", 1)[1].strip()
+            elif "Reason for joining:" in item_str:
+                data['reason'] = item_str.split(":", 1)[1].strip()
+            elif "Email:" in item_str:
+                data['email'] = item_str.split(":", 1)[1].strip()
+            elif "IP Address:" in item_str:
+                data['ip_address'] = item_str.split(":", 1)[1].strip()
+            elif "NOTE:" in item_str:
+                data['note'] = item_str.split(":", 1)[1].strip()
+        
+        # If full_name not found but we have last name, use it
+        if not data['full_name'] and self.user_last_name:
+            data['full_name'] = self.user_last_name
+        
+        return data
+    
+    def generate_admin_signup_notification(self):
+        """Generate admin notification for new signups"""
+        data = self.parsed_data
+        
+        return f"""
+        <html>
+        <body style="margin:0; padding:20px; background:#000000; font-family:Segoe UI, Arial, sans-serif; color:#fafaf5;">
+
+        <table align="center" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background:#0a0a0f; border:2px solid #e74c3c; border-radius:12px;">
+            <tr>
+                <td style="padding:30px; text-align:center; background:#e74c3c; color:white;">
+                    <h1 style="margin:0; font-size:28px; font-weight:800;">🚨 NEW SIGNUP RECEIVED</h1>
+                    <p style="margin:10px 0 0; font-size:16px; opacity:0.9;">NJROTC Program • {self.current_time}</p>
+                </td>
+            </tr>
+
+            <tr>
+                <td style="padding:25px;">
+
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
+                        <tr>
+                            <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Student Name</td>
+                        </tr>
+                        <tr>
+                            <td style="font-size:18px; font-weight:600; color:#fafaf5;">{data['full_name']}</td>
+                        </tr>
+                    </table>
+
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
+                        <tr>
+                            <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Grade Level</td>
+                        </tr>
+                        <tr>
+                            <td style="font-size:18px; font-weight:600; color:#fafaf5;">Grade {data['grade']}</td>
+                        </tr>
+                    </table>
+
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
+                        <tr>
+                            <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Student ID</td>
+                        </tr>
+                        <tr>
+                            <td style="font-size:18px; font-weight:600; color:#fafaf5;">{data['student_id']}</td>
+                        </tr>
+                    </table>
+
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
+                        <tr>
+                            <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Contact Email</td>
+                        </tr>
+                        <tr>
+                            <td style="font-size:18px; font-weight:600; color:#fafaf5;">{data['email']}</td>
+                        </tr>
+                    </table>
+
+                    <h3 style="margin-top:30px; color:#e6b220; font-size:18px;">Student's Reason for Joining</h3>
+                    <div style="background:#001a33; border-left:4px solid #e6b220; padding:15px; border-radius:6px; margin-bottom:20px;">
+                        <p style="margin:0; font-size:16px; font-style:italic; color:#fafaf5;">"{data['reason']}"</p>
+                    </div>
+
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #666; border-radius:12px; margin-bottom:20px;">
+                        <tr>
+                            <td style="color:#999; font-size:11px; text-transform:uppercase;">Technical Details</td>
+                        </tr>
+                        <tr>
+                            <td style="font-size:12px; color:#ccc;">
+                                IP Address: {data['ip_address'] or 'N/A'}<br>
+                                Submitted: {data['timestamp']}<br>
+                                Auto-generated by NJROTC Website
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div style="text-align:center; margin-top:40px; padding-top:20px; border-top:1px solid #023c71;">
+                        <h2 style="color:#e6b220; font-size:24px; margin:0;">Action Required</h2>
+                        <p style="max-width:500px; margin:10px auto 0; font-size:15px; color:#cccccc;">
+                            Please follow up with this student within 3 business days to complete their enrollment process.
+                        </p>
+                    </div>
+
+                    <p style="margin-top:30px; font-size:12px; color:#aaaaaa; text-align:center;">
+                        <strong>Parlier Unified NJROTC Automated Notification</strong><br>
+                        This is an automated message. Please do not reply.<br>
+                        System generated at {self.current_time}
+                    </p>
+
+                </td>
+            </tr>
+        </table>
+
+        </body>
+        </html>
+        """
+    
+    def generate_signup_confirmation(self):
+        """Generate signup confirmation email for student"""
+        data = self.parsed_data
         
         return f"""
         <html>
@@ -78,54 +205,43 @@ class GmailAPIBot:
             <tr>
                 <td style="padding:25px;">
 
-                    <table width="100%" cellpadding="0" cellspacing="0"> <tr> <td style="text-align:center; padding-bottom:20px;"> <h2 style="margin:10px 0 0; font-size:24px; color:#2ecc71;">Test</h2> </td> </tr> </table>
+                    <div style="text-align:center; padding:15px; border-radius:8px; margin-bottom:25px;">
+                        <h2 style="margin:0; color:white; font-size:24px;">Test</h2>
+                    </div>
 
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px;">
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Full Name</td>
                         </tr>
                         <tr>
-                            <td style="font-size:18px; font-weight:600; color:#fafaf5;">{full_name}</td>
+                            <td style="font-size:18px; font-weight:600; color:#fafaf5;">{data['full_name']}</td>
                         </tr>
                     </table>
 
-                    <br>
-
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px;">
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Grade Level</td>
                         </tr>
                         <tr>
-                            <td style="font-size:18px; font-weight:600; color:#fafaf5;">Grade {grade}</td>
+                            <td style="font-size:18px; font-weight:600; color:#fafaf5;">Grade {data['grade']}</td>
                         </tr>
                     </table>
 
-                    <br>
-
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px;">
+                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px; margin-bottom:15px;">
                         <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Student ID</td>
                         </tr>
                         <tr>
-                            <td style="font-size:18px; font-weight:600; color:#fafaf5;">{student_id}</td>
-                        </tr>
-                    </table>
-
-                    <br>
-
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #023c71; border-radius:12px;">
-                        <tr>
-                            <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Submission Date</td>
-                        </tr>
-                        <tr>
-                            <td style="font-size:18px; font-weight:600; color:#fafaf5;">{self.current_time}</td>
+                            <td style="font-size:18px; font-weight:600; color:#fafaf5;">{data['student_id']}</td>
                         </tr>
                     </table>
 
                     <h3 style="margin-top:30px; color:#e6b220; font-size:18px;">Your Reason for Joining</h3>
-                    <div style="background:#001a33; border-left:4px solid #e6b220; padding:15px; border-radius:6px;">
-                        <p style="margin:0; font-size:16px; font-style:italic; color:#fafaf5;">"{reason}"</p>
+                    <div style="background:#001a33; border-left:4px solid #e6b220; padding:15px; border-radius:6px; margin-bottom:20px;">
+                        <p style="margin:0; font-size:16px; font-style:italic; color:#fafaf5;">"{data['reason']}"</p>
                     </div>
+
+                   
 
                     <div style="text-align:center; margin-top:40px; padding-top:20px; border-top:1px solid #023c71;">
                         <h2 style="color:#e6b220; font-size:24px; margin:0;">Thank You</h2>
@@ -149,15 +265,8 @@ class GmailAPIBot:
         """
     
     def generate_suggestion_email(self):
-        """Generate suggestion notification email matching website fundraising style"""
-        suggestion_type = "General"
-        suggestion_text = "No suggestion provided"
-        
-        for item in self.selected_items:
-            if "Suggestion Type:" in item:
-                suggestion_type = item.split(":", 1)[1].strip()
-            elif "Suggestion:" in item:
-                suggestion_text = item.split(":", 1)[1].strip()
+        """Generate suggestion notification email"""
+        data = self.parsed_data
         
         return f"""
         <!DOCTYPE html>
@@ -242,7 +351,6 @@ class GmailAPIBot:
 
         """
     
-    
     def authenticate_gmail(self):
         """Authenticate with Gmail API using OAuth 2.0"""
         SCOPES = ['https://www.googleapis.com/auth/gmail.send']
@@ -257,7 +365,6 @@ class GmailAPIBot:
             except Exception as e:
                 print(f"Error loading token from env: {e}")
 
-        # Fallback to token.pickle file
         if not creds or not creds.valid:
             token_file = 'token.pickle'
             if os.path.exists(token_file):
@@ -337,7 +444,7 @@ def main():
         print("Running in test mode...")
         last_name = "Test"
         rank = ""
-        selected_items = ["Test Item from NJROTC Website"]
+        selected_items = ["Student: Test User", "Grade: 10", "Student ID: 123456", "Reason for joining: Testing the system"]
         recipient_email = os.getenv("TEST_EMAIL", "test@example.com")
     
     try:
