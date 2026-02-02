@@ -71,12 +71,8 @@ class GmailAPIBot:
                 reason = item.split(":", 1)[1].strip()
         
         return f"""
-        <!DOCTYPE html>
-        <html lang="en">
+        <html>
         <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>NJROTC Signup Confirmation</title>
             <style>
                 /* Fundraising Page Style */
                 body {{
@@ -90,18 +86,29 @@ class GmailAPIBot:
                     padding: 0;
                     font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
                     line-height: 1.6;
+                    padding: 20px;
                 }}
                 
-                body::before {{
+                .email-container {{
+                    max-width: 600px;
+                    margin: 0 auto;
+                    background: linear-gradient(135deg, rgba(10, 10, 15, 0.95), rgba(2, 60, 113, 0.2));
+                    border: 2px solid #e6b220;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+                    position: relative;
+                }}
+                
+                .email-container::before {{
                     content: "";
                     position: absolute;
                     top: 0;
                     left: 0;
                     width: 100%;
                     height: 100%;
-                    background: 
-                        radial-gradient(circle at 20% 50%, rgb(2 60 113 / 40%) 0%, transparent 50%),
-                        radial-gradient(circle at 80% 20%, rgb(2 60 113 / 40%) 0%, transparent 50%);
+                    background: linear-gradient(45deg, rgba(2, 60, 113, 0.3), rgba(230, 178, 32, 0.1));
+                    opacity: 0.3;
                     z-index: -1;
                 }}
                 
@@ -121,21 +128,15 @@ class GmailAPIBot:
                     font-weight: 800;
                     margin-bottom: 1rem;
                     color: #fafaf5;
-                    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-                    position: relative;
-                    display: inline-block;
+                    opacity: 0.8;
                 }}
                 
-                .section-title::after {{
-                    content: "";
-                    position: absolute;
-                    bottom: -10px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    width: 100px;
-                    height: 4px;
-                    background: #e6b220;
-                    border-radius: 2px;
+                .content {{
+                    padding: 30px;
+                }}
+                
+                .content-section {{
+                    margin-bottom: 25px;
                 }}
                 
                 .section-subtitle {{
@@ -333,6 +334,7 @@ class GmailAPIBot:
                     margin-top: 2rem;
                     padding-top: 1rem;
                     border-top: 1px solid rgba(230, 178, 32, 0.2);
+                    margin-top: 30px;
                 }}
                 
                 /* Icon styles */
@@ -526,12 +528,8 @@ class GmailAPIBot:
                 suggestion_text = item.split(":", 1)[1].strip()
         
         return f"""
-        <!DOCTYPE html>
-        <html lang="en">
+        <html>
         <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>NJROTC Suggestion Received</title>
             <style>
                 /* Fundraising Page Style */
                 body {{
@@ -545,19 +543,7 @@ class GmailAPIBot:
                     padding: 0;
                     font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
                     line-height: 1.6;
-                }}
-                
-                body::before {{
-                    content: "";
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background: 
-                        radial-gradient(circle at 20% 50%, rgb(2 60 113 / 40%) 0%, transparent 50%),
-                        radial-gradient(circle at 80% 20%, rgb(2 60 113 / 40%) 0%, transparent 50%);
-                    z-index: -1;
+                    padding: 20px;
                 }}
                 
                 .email-container {{
@@ -598,19 +584,16 @@ class GmailAPIBot:
                     color: rgba(250, 250, 245, 0.9);
                     max-width: 600px;
                     margin: 0 auto;
-                    line-height: 1.6;
-                }}
-                
-                .content-card {{
-                    background: rgba(0, 0, 0, 0.7);
-                    border: 1px solid rgba(2, 60, 113, 0.7);
-                    border-radius: 20px;
+                    background: linear-gradient(135deg, rgba(10, 10, 15, 0.95), rgba(2, 60, 113, 0.2));
+                    border: 2px solid #e6b220;
+                    border-radius: 12px;
                     overflow: hidden;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
                     position: relative;
-                    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
                 }}
                 
-                .card-overlay {{
+                .email-container::before {{
+                    content: "";
                     position: absolute;
                     top: 0;
                     left: 0;
@@ -876,6 +859,20 @@ class GmailAPIBot:
                     </div>
                 </div>
             </div>
+        </body>
+        </html>
+        """
+    
+    def generate_generic_email(self):
+        """Generate generic notification email"""
+        items_html = "\n".join([f"<li>{item}</li>" for item in self.selected_items])
+        return f"""
+        <html>
+        <body>
+            <h2>NJROTC Notification</h2>
+            <p><strong>Date:</strong> {self.current_time}</p>
+            <p><strong>Items:</strong></p>
+            <ul>{items_html}</ul>
         </body>
         </html>
         """
