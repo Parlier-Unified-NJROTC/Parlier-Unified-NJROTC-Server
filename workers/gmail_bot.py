@@ -32,7 +32,7 @@ class GmailAPIBot:
         
         self.send_admin_copy = True  
         self.send_user_copy = True
-        self.send_both_templates = send_both_templates
+        self.send_both_templates = send_both_templates 
         
         self.user_last_name = last_name
         self.selected_items = selected_items or []
@@ -44,8 +44,6 @@ class GmailAPIBot:
         self.email_templates = []  
         
         items_str = str(self.selected_items).lower()
-
-        
         
         if "signup" in items_str:
             self.should_send = True
