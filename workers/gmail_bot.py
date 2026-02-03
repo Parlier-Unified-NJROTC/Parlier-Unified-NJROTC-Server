@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-Email Bot for NJROTC Using Gmail API
-"""
 import os
 import sys
 import json
@@ -10,7 +7,6 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from dotenv import load_dotenv
-
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -20,15 +16,54 @@ import pickle
 
 load_dotenv()
 
-print("=== GMAIL API BOT STARTING ===")
+class ColorLogger:
+    COLORS = {
+        'red': '\033[91m',
+        'green': '\033[92m',
+        'yellow': '\033[93m',
+        'blue': '\033[94m',
+        'magenta': '\033[95m',
+        'cyan': '\033[96m',
+        'white': '\033[97m',
+        'reset': '\033[0m',
+        'bold': '\033[1m',
+    }
+    
+    @classmethod
+    def log(cls, message, color='white', level='INFO'):
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        color_code = cls.COLORS.get(color, cls.COLORS['white'])
+        reset_code = cls.COLORS['reset']
+        print(f"{color_code}[{timestamp}] [{level}] {message}{reset_code}")
+    
+    @classmethod
+    def success(cls, message):
+        cls.log(message, 'green', 'SUCCESS')
+    
+    @classmethod
+    def error(cls, message):
+        cls.log(message, 'red', 'ERROR')
+    
+    @classmethod
+    def warning(cls, message):
+        cls.log(message, 'yellow', 'WARNING')
+    
+    @classmethod
+    def info(cls, message):
+        cls.log(message, 'blue', 'INFO')
+    
+    @classmethod
+    def debug(cls, message):
+        cls.log(message, 'cyan', 'DEBUG')
+
+ColorLogger.info("=== GMAIL API BOT STARTING ===")
 
 class GmailAPIBot:
-    def __init__(self, last_name="", rank="", selected_items=None, recipient_email="", send_both_templates=True):
-        print(f"Initializing GmailAPIBot for: {recipient_email}")
+    def __init__(self, last_name="", rank="", selected_items=None, recipient_email="", send_both_templates=False):
+        ColorLogger.info(f"Initializing GmailAPIBot for: {recipient_email}")
         
         self.sender_email = os.getenv("SENDER_EMAIL", "njrotcparlier@gmail.com")
         self.recipients = [recipient_email] if recipient_email else []
-        
         
         self.send_admin_copy = True  
         self.send_user_copy = True
@@ -44,8 +79,6 @@ class GmailAPIBot:
         self.email_templates = []  
         
         items_str = str(self.selected_items).lower()
-
-        
         
         if "signup" in items_str:
             self.should_send = True
@@ -61,9 +94,9 @@ class GmailAPIBot:
                     "body_html": self.generate_signup_confirmation(),
                     "is_admin": False
                 })
-                print(f"✓ Will send BOTH admin and user emails to: {recipient_email}")
+                ColorLogger.success(f"Will send BOTH admin and user emails to: {recipient_email}")
             else:
-                print(f"✓ Will send ONLY admin copy email to: {recipient_email}")
+                ColorLogger.info(f"Will send ONLY admin copy email to: {recipient_email}")
             
         elif "suggestion" in items_str:
             self.should_send = True
@@ -72,20 +105,18 @@ class GmailAPIBot:
                 "body_html": self.generate_suggestion_email(),
                 "is_admin": True  
             })
-            print(f"✓ Will send suggestion email to: {recipient_email}")
+            ColorLogger.success(f"Will send suggestion email to: {recipient_email}")
         else:
-            print(f"! Not sending email - no specific template for items: {self.selected_items}")
+            ColorLogger.warning(f"Not sending email - no specific template for items")
             self.should_send = False
         
         if self.should_send:
-            print(f"✓ Will send {len(self.email_templates)} email(s)")
-            print(f"Recipients: {self.recipients}")
-            print(f"Parsed Data: {self.parsed_data}")
+            ColorLogger.info(f"Will send {len(self.email_templates)} email(s)")
+            ColorLogger.info(f"Recipients: {self.recipients}")
         else:
-            print(f"✗ Will NOT send email - no matching template")
+            ColorLogger.error(f"Will NOT send email - no matching template")
     
     def parse_selected_items(self):
-        """Parse data from selected items array"""
         data = {
             'full_name': '',
             'grade': '',
@@ -126,7 +157,6 @@ class GmailAPIBot:
         return data
     
     def generate_admin_signup_notification(self):
-        """Generate admin notification for new signups"""
         data = self.parsed_data
         
         return f"""
@@ -204,7 +234,6 @@ class GmailAPIBot:
         """
     
     def generate_signup_confirmation(self):
-        """Generate signup confirmation email for student"""
         data = self.parsed_data
         
         return f"""
@@ -289,7 +318,6 @@ class GmailAPIBot:
         """
     
     def generate_suggestion_email(self):
-        """Generate suggestion notification email"""
         data = self.parsed_data
         
         return f"""
@@ -361,7 +389,6 @@ class GmailAPIBot:
         """
     
     def authenticate_gmail(self):
-        """Authenticate with Gmail API using OAuth 2.0"""
         SCOPES = ['https://www.googleapis.com/auth/gmail.send']
         creds = None
         
@@ -370,51 +397,50 @@ class GmailAPIBot:
             try:
                 token_info = json.loads(token_json)
                 creds = Credentials.from_authorized_user_info(token_info, SCOPES)
-                print("✓ Loaded credentials from environment variable")
+                ColorLogger.success("Loaded credentials from environment variable")
             except Exception as e:
-                print(f"✗ Error loading token from env: {e}")
+                ColorLogger.error(f"Error loading token from env: {e}")
 
         if not creds or not creds.valid:
             token_file = 'token.pickle'
             if os.path.exists(token_file):
-                print(f"✓ Loading credentials from {token_file}")
+                ColorLogger.info(f"Loading credentials from {token_file}")
                 try:
                     with open(token_file, 'rb') as token:
                         creds = pickle.load(token)
                 except Exception as e:
-                    print(f"✗ Error loading token file: {e}")
+                    ColorLogger.error(f"Error loading token file: {e}")
         
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                print("✓ Refreshing expired credentials")
+                ColorLogger.info("Refreshing expired credentials")
                 try:
                     creds.refresh(Request())
                 except Exception as e:
-                    print(f"✗ Error refreshing credentials: {e}")
+                    ColorLogger.error(f"Error refreshing credentials: {e}")
                     return None
             else:
-                print("✗ No valid credentials found")
+                ColorLogger.error("No valid credentials found")
                 return None
         
         return build('gmail', 'v1', credentials=creds)
     
     def send_email(self):
-        """Send email(s) using Gmail API"""
-        print("=== ATTEMPTING TO SEND EMAIL(S) VIA GMAIL API ===")
+        ColorLogger.info("=== ATTEMPTING TO SEND EMAIL(S) VIA GMAIL API ===")
         
         if not self.should_send:
-            print("! Skipping email - no matching template for items")
+            ColorLogger.warning("Skipping email - no matching template for items")
             return True
         
         if not self.recipients:
-            print("✗ ERROR: No recipient email specified")
+            ColorLogger.error("ERROR: No recipient email specified")
             return False
         
         try:
             service = self.authenticate_gmail()
             if not service:
-                print("✗ ERROR: Failed to authenticate with Gmail API")
-                print("Tip: You need to generate a token first (see README)")
+                ColorLogger.error("ERROR: Failed to authenticate with Gmail API")
+                ColorLogger.warning("Tip: You need to generate a token first")
                 return False
             
             success_count = 0
@@ -428,7 +454,7 @@ class GmailAPIBot:
                 
                 raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
                 
-                print(f"Sending {template['subject']} to: {self.recipients}")
+                ColorLogger.info(f"Sending {template['subject']} to: {self.recipients}")
                 
                 try:
                     sent_message = service.users().messages().send(
@@ -436,34 +462,34 @@ class GmailAPIBot:
                         body={'raw': raw_message}
                     ).execute()
                     
-                    print(f"✓ Email sent: {template['subject']}")
-                    print(f"  Message ID: {sent_message['id']}")
+                    ColorLogger.success(f"Email sent: {template['subject']}")
+                    ColorLogger.info(f"Message ID: {sent_message['id']}")
                     success_count += 1
                     
                 except Exception as e:
-                    print(f"✗ Failed to send {template['subject']}: {e}")
+                    ColorLogger.error(f"Failed to send {template['subject']}: {e}")
             
             if success_count == len(self.email_templates):
-                print(f"✓ All {success_count} email(s) sent successfully")
+                ColorLogger.success(f"All {success_count} email(s) sent successfully")
                 return True
             elif success_count > 0:
-                print(f"! {success_count}/{len(self.email_templates)} email(s) sent")
+                ColorLogger.warning(f"{success_count}/{len(self.email_templates)} email(s) sent")
                 return True
             else:
-                print("✗ No emails were sent successfully")
+                ColorLogger.error("No emails were sent successfully")
                 return False
                 
         except HttpError as error:
-            print(f"✗ Gmail API HTTP Error: {error}")
+            ColorLogger.error(f"Gmail API HTTP Error: {error}")
             return False
         except Exception as e:
-            print(f"✗ Error sending email: {type(e).__name__}: {str(e)}")
+            ColorLogger.error(f"Error sending email: {type(e).__name__}: {str(e)}")
             import traceback
             traceback.print_exc()
             return False
 
 def main():
-    print("=== EMAIL BOT MAIN FUNCTION ===")
+    ColorLogger.info("=== EMAIL BOT MAIN FUNCTION ===")
     
     if len(sys.argv) >= 5:
         last_name = sys.argv[1]
@@ -472,7 +498,7 @@ def main():
         recipient_email = sys.argv[4]
         send_both = True if len(sys.argv) < 6 else sys.argv[5].lower() == 'true'
     else:
-        print("🔧 Running in test mode...")
+        ColorLogger.warning("Running in test mode...")
         last_name = "Test"
         rank = ""
         selected_items = ["Student: Test User", "Grade: 10", "Student ID: 123456", "Reason for joining: Testing the system"]
@@ -484,13 +510,13 @@ def main():
         success = bot.send_email()
         
         if success:
-            print("✓ Email process completed successfully")
+            ColorLogger.success("Email process completed successfully")
             return 0
         else:
-            print("✗ Email process failed")
+            ColorLogger.error("Email process failed")
             return 1
     except Exception as e:
-        print(f"✗ Error: {type(e).__name__}: {str(e)}")
+        ColorLogger.error(f"Error: {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()
         return 1

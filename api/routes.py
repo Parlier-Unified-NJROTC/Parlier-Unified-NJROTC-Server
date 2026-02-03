@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
-import json
 import threading
 import sys
 import time
@@ -13,17 +12,13 @@ from threading import Lock
 sys.path.append('workers')
 
 class SimpleRateLimiter:
-    """Simple rate limiter without external dependencies"""
-    
     def __init__(self):
         self.requests = {}
         self.lock = Lock()
     
     def check_limit(self, ip, limit=100, window=3600):
-        """Check if IP has exceeded rate limit"""
         with self.lock:
             current_time = time.time()
-            
             self._clean_old_entries(current_time, window)
             
             if ip not in self.requests:
@@ -39,7 +34,6 @@ class SimpleRateLimiter:
             return True
     
     def _clean_old_entries(self, current_time, window):
-        """Remove old entries to prevent memory leaks"""
         cutoff = current_time - (window * 2) 
         for ip in list(self.requests.keys()):
             self.requests[ip] = [ts for ts in self.requests[ip] if ts > cutoff]
@@ -47,7 +41,6 @@ class SimpleRateLimiter:
                 del self.requests[ip]
 
 class RequestQueue:
-    """Thread-safe request queue"""
     def __init__(self, max_queue_size=100, max_workers=5):
         self.queue = Queue(maxsize=max_queue_size)
         self.max_workers = max_workers
@@ -57,13 +50,11 @@ class RequestQueue:
         self.start_workers()
     
     def start_workers(self):
-        """Start worker threads to process the queue"""
         for _ in range(self.max_workers):
             worker = threading.Thread(target=self._process_queue, daemon=True)
             worker.start()
     
     def add_request(self, endpoint, data, ip_address):
-        """Add request to queue with timestamp tracking"""
         current_time = time.time()
         
         if self._check_rate_limit(ip_address, current_time):
@@ -78,15 +69,14 @@ class RequestQueue:
             })
             
             if ip_address not in self.request_timestamps:
-                self.request_timestamps[ip_address] = deque(maxlen=100)
+                self.request_timestamps[ip_address] = deque(maxlen=200)
             self.request_timestamps[ip_address].append(current_time)
             
             return True, "Request queued"
         except:
             return False, "Queue full"
     
-    def _check_rate_limit(self, ip_address, current_time, window_seconds=60, max_requests=30):
-        """Check if IP has exceeded rate limit"""
+    def _check_rate_limit(self, ip_address, current_time, window_seconds=60, max_requests=100):
         if ip_address not in self.request_timestamps:
             return False
         
@@ -97,18 +87,16 @@ class RequestQueue:
         return request_count >= max_requests
     
     def _clean_old_timestamps(self, current_time, max_age=300):
-        """Clean old timestamps"""
         cutoff = current_time - max_age
         for ip in list(self.request_timestamps.keys()):
             self.request_timestamps[ip] = deque(
                 [ts for ts in self.request_timestamps[ip] if ts > cutoff],
-                maxlen=100
+                maxlen=200
             )
             if not self.request_timestamps[ip]:
                 del self.request_timestamps[ip]
     
     def _process_queue(self):
-        """Worker thread to process queued requests"""
         while True:
             try:
                 task = self.queue.get(timeout=1)
@@ -116,6 +104,46 @@ class RequestQueue:
                 self.queue.task_done()
             except Empty:
                 continue
+
+class ColorLogger:
+    COLORS = {
+        'red': '\033[91m',
+        'green': '\033[92m',
+        'yellow': '\033[93m',
+        'blue': '\033[94m',
+        'magenta': '\033[95m',
+        'cyan': '\033[96m',
+        'white': '\033[97m',
+        'reset': '\033[0m',
+        'bold': '\033[1m',
+    }
+    
+    @classmethod
+    def log(cls, message, color='white', level='INFO'):
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        color_code = cls.COLORS.get(color, cls.COLORS['white'])
+        reset_code = cls.COLORS['reset']
+        print(f"{color_code}[{timestamp}] [{level}] {message}{reset_code}")
+    
+    @classmethod
+    def success(cls, message):
+        cls.log(message, 'green', 'SUCCESS')
+    
+    @classmethod
+    def error(cls, message):
+        cls.log(message, 'red', 'ERROR')
+    
+    @classmethod
+    def warning(cls, message):
+        cls.log(message, 'yellow', 'WARNING')
+    
+    @classmethod
+    def info(cls, message):
+        cls.log(message, 'blue', 'INFO')
+    
+    @classmethod
+    def debug(cls, message):
+        cls.log(message, 'cyan', 'DEBUG')
 
 def create_app():
     app = Flask(__name__)
@@ -137,18 +165,20 @@ def create_app():
 
     @app.before_request
     def before_request():
-        """Security checks before processing any request"""
         if request.method == 'OPTIONS':
             return
 
         ip = request.remote_addr
-        if not rate_limiter.check_limit(ip, limit=200, window=86400):  # 200/day
+        
+        if not rate_limiter.check_limit(ip, limit=1000, window=86400):
+            ColorLogger.warning(f"Daily rate limit exceeded for IP: {ip}")
             return jsonify({
                 "error": "Daily rate limit exceeded"
             }), 429
         
         if request.path.startswith('/api/'):
-            if not rate_limiter.check_limit(ip, limit=50, window=3600):  # 50/hour
+            if not rate_limiter.check_limit(ip, limit=500, window=3600):
+                ColorLogger.warning(f"Hourly rate limit exceeded for IP: {ip}")
                 return jsonify({
                     "error": "Hourly rate limit exceeded"
                 }), 429
@@ -161,7 +191,6 @@ def create_app():
     
     @app.after_request
     def after_request(response):
-        """Add security headers"""
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'DENY'
         response.headers['X-XSS-Protection'] = '1; mode=block'
@@ -169,6 +198,7 @@ def create_app():
     
     @app.route('/health', methods=['GET'])
     def health_check():
+        ColorLogger.debug(f"Health check - Queue size: {request_queue.queue.qsize()}")
         return jsonify({
             "status": "healthy",
             "timestamp": datetime.now().isoformat(),
@@ -178,7 +208,6 @@ def create_app():
         })
     
     def validate_signup_data(data):
-        """Validate signup form data"""
         required_fields = ['fullName', 'schoolId', 'grade', 'email', 'reason']
         for field in required_fields:
             if field not in data or not data[field]:
@@ -200,45 +229,40 @@ def create_app():
         return True, "Valid"
     
     def run_email_bot(last_name, selected_items, recipient_email, extra_data=None):
-        """Run email bot using Gmail API - sends BOTH templates to user"""
         try:
-            print(f"=== STARTING EMAIL BOT (USER - BOTH TEMPLATES) ===")
-            print(f"Recipient: {recipient_email}")
+            ColorLogger.info(f"=== STARTING EMAIL BOT (USER - BOTH TEMPLATES) ===")
+            ColorLogger.info(f"Recipient: {recipient_email}")
             
             from workers.gmail_bot import GmailAPIBot
             
             bot = GmailAPIBot(last_name, "", selected_items, recipient_email)
             
-            # Ensure it has both templates (should already be set in __init__)
             if extra_data:
                 bot.extra_data = extra_data
             
             success = bot.send_email()
             
             if success:
-                print(f"✓ Email with both templates sent successfully to {recipient_email}")
+                ColorLogger.success(f"Email with both templates sent successfully to {recipient_email}")
             else:
-                print(f"✗ Failed to send email to {recipient_email}")
+                ColorLogger.error(f"Failed to send email to {recipient_email}")
                 
-            print(f"=== EMAIL BOT COMPLETE ===")
+            ColorLogger.info(f"=== EMAIL BOT COMPLETE ===")
             
         except Exception as e:
-            print(f"ERROR in email bot: {str(e)}")
+            ColorLogger.error(f"ERROR in email bot: {str(e)}")
             import traceback
             traceback.print_exc()
     
     def run_admin_email_only(last_name, selected_items, recipient_email, extra_data=None):
-        """Run email bot for admin only (sends only admin copy)"""
         try:
-            print(f"=== STARTING ADMIN-ONLY EMAIL BOT ===")
-            print(f"Admin Recipient: {recipient_email}")
+            ColorLogger.info(f"=== STARTING ADMIN-ONLY EMAIL BOT ===")
+            ColorLogger.info(f"Admin Recipient: {recipient_email}")
             
             from workers.gmail_bot import GmailAPIBot
             
-            # Create bot but we'll modify it to send only admin copy
             bot = GmailAPIBot(last_name, "", selected_items, recipient_email)
             
-            # Override the email_templates to only include admin template
             bot.email_templates = [{
                 "subject": "NJROTC Program Signup Confirmation (Admin Copy)",
                 "body_html": bot.generate_admin_signup_notification(),
@@ -251,14 +275,14 @@ def create_app():
             success = bot.send_email()
             
             if success:
-                print(f"✓ Admin-only email sent successfully to {recipient_email}")
+                ColorLogger.success(f"Admin-only email sent successfully to {recipient_email}")
             else:
-                print(f"✗ Failed to send admin-only email to {recipient_email}")
+                ColorLogger.error(f"Failed to send admin-only email to {recipient_email}")
                 
-            print(f"=== ADMIN-ONLY EMAIL BOT COMPLETE ===")
+            ColorLogger.info(f"=== ADMIN-ONLY EMAIL BOT COMPLETE ===")
             
         except Exception as e:
-            print(f"ERROR in admin-only email bot: {str(e)}")
+            ColorLogger.error(f"ERROR in admin-only email bot: {str(e)}")
             import traceback
             traceback.print_exc()
     
@@ -274,9 +298,11 @@ def create_app():
             
             is_valid, message = validate_signup_data(data)
             if not is_valid:
+                ColorLogger.warning(f"Invalid signup data from {ip_address}: {message}")
                 return jsonify({"error": message}), 400
             
-            if not rate_limiter.check_limit(ip_address, limit=10, window=3600):
+            if not rate_limiter.check_limit(ip_address, limit=50, window=3600):
+                ColorLogger.warning(f"Signup rate limit exceeded for IP: {ip_address}")
                 return jsonify({
                     "error": "Too many signup requests. Please try again later."
                 }), 429
@@ -288,16 +314,15 @@ def create_app():
             )
             
             if not queued:
+                ColorLogger.warning(f"Queue full for IP: {ip_address}")
                 return jsonify({
                     "error": "System busy. Please try again later.",
                     "details": queue_message
                 }), 429
             
-            # Extract last name from full name
             full_name_parts = data['fullName'].strip().split()
             last_name = full_name_parts[-1] if full_name_parts else "Student"
             
-            # Create selected_items with student info for USER
             user_selected_items = [
                 f"Student: {data['fullName']}",
                 f"Grade: {data['grade']}",
@@ -309,7 +334,6 @@ def create_app():
                 f"NOTE: Student signup - sending both user and admin copies"
             ]
             
-            # Create selected_items for ADMIN (actual teacher/admin)
             admin_selected_items = [
                 f"Student: {data['fullName']}",
                 f"Grade: {data['grade']}",
@@ -330,8 +354,7 @@ def create_app():
                 'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 'ip_address': ip_address
             }
-            
-            # Send email to USER - they will get BOTH user confirmation AND admin copy
+
             user_email_thread = threading.Thread(
                 target=run_email_bot,
                 args=(last_name, user_selected_items, data['email'], extra_data)
@@ -339,20 +362,19 @@ def create_app():
             user_email_thread.daemon = True
             user_email_thread.start()
             
-            print(f"✓ User email with BOTH templates queued for: {data['email']}")
+            ColorLogger.success(f"User email with BOTH templates queued for: {data['email']}")
             
-            # Send separate email to ACTUAL ADMIN/TEACHER (only admin copy)
             admin_email = os.getenv('ADMIN_EMAIL')
             if admin_email and admin_email.strip():
-                # For actual admin, send only admin copy
                 admin_email_thread = threading.Thread(
                     target=run_admin_email_only,
                     args=(last_name, admin_selected_items, admin_email, extra_data)
                 )
                 admin_email_thread.daemon = True
                 admin_email_thread.start()
-                print(f"✓ Admin notification email queued for actual admin: {admin_email}")
+                ColorLogger.success(f"Admin notification email queued for actual admin: {admin_email}")
             
+            ColorLogger.success(f"Signup processed successfully for: {data['fullName']} ({data['email']})")
             return jsonify({
                 "success": True,
                 "message": "Signup received successfully",
@@ -366,7 +388,7 @@ def create_app():
             }), 200
             
         except Exception as e:
-            print(f"Error processing signup from {ip_address}: {str(e)}")
+            ColorLogger.error(f"Error processing signup from {ip_address}: {str(e)}")
             return jsonify({
                 "error": "Internal server error",
                 "details": "Please try again later"
@@ -385,16 +407,19 @@ def create_app():
             required_fields = ['fullName', 'suggestionType', 'suggestionText']
             for field in required_fields:
                 if field not in data or not data[field]:
+                    ColorLogger.warning(f"Missing field {field} in suggestion from {ip_address}")
                     return jsonify({
                         "error": f"Missing required field: {field}"
                     }), 400
             
-            if not rate_limiter.check_limit(ip_address, limit=400, window=600):
+            if not rate_limiter.check_limit(ip_address, limit=200, window=600):
+                ColorLogger.warning(f"Suggestion rate limit exceeded for IP: {ip_address}")
                 return jsonify({
                     "error": "Too many suggestion requests. Please try again later."
                 }), 429
             
             if len(data['suggestionText']) > 2000:
+                ColorLogger.warning(f"Suggestion too long from {ip_address}")
                 return jsonify({
                     "error": "Suggestion text too long (max 2000 characters)"
                 }), 400
@@ -406,6 +431,7 @@ def create_app():
             )
             
             if not queued:
+                ColorLogger.warning(f"Queue full for suggestion from IP: {ip_address}")
                 return jsonify({
                     "error": "System busy. Please try again later.",
                     "details": queue_message
@@ -436,8 +462,9 @@ def create_app():
                 )
                 email_thread.daemon = True
                 email_thread.start()
-                print(f"✓ Suggestion email queued for admin: {admin_email}")
+                ColorLogger.success(f"Suggestion email queued for admin: {admin_email}")
             
+            ColorLogger.success(f"Suggestion processed from: {data['fullName']}")
             return jsonify({
                 "success": True,
                 "message": "Suggestion submitted successfully",
@@ -451,7 +478,7 @@ def create_app():
             }), 200
             
         except Exception as e:
-            print(f"Error processing suggestion from {ip_address}: {str(e)}")
+            ColorLogger.error(f"Error processing suggestion from {ip_address}: {str(e)}")
             return jsonify({
                 "error": "Internal server error",
                 "details": "Please try again later"
@@ -459,11 +486,12 @@ def create_app():
     
     @app.route('/api/queue-status', methods=['GET'])
     def queue_status():
-        """Endpoint to check queue status (for monitoring)"""
         auth = request.headers.get('Authorization')
         if not auth or not auth.startswith('Basic '):
+            ColorLogger.warning("Unauthorized queue status access")
             return jsonify({"error": "Unauthorized"}), 401
         
+        ColorLogger.debug(f"Queue status checked - Size: {request_queue.queue.qsize()}")
         return jsonify({
             "queue_size": request_queue.queue.qsize(),
             "max_queue_size": request_queue.queue.maxsize,
@@ -472,20 +500,22 @@ def create_app():
     
     @app.route('/test-email', methods=['GET'])
     def test_email():
-        """Test endpoint to verify email sending"""
         auth = request.headers.get('Authorization')
         if not auth or not auth.startswith('Basic '):
+            ColorLogger.warning("Unauthorized test email access")
             return jsonify({"error": "Unauthorized"}), 401
         
         test_email = request.args.get('email', 'saulSanchez.out@gmail.com')
 
         if '@' not in test_email or '.' not in test_email:
+            ColorLogger.warning(f"Invalid email format for test: {test_email}")
             return jsonify({
                 "success": False,
                 "error": "Invalid email format"
             }), 400
         
         try:
+            ColorLogger.info(f"Test email requested for: {test_email}")
             from workers.gmail_bot import GmailAPIBot
             
             bot = GmailAPIBot(
@@ -497,6 +527,11 @@ def create_app():
             
             success = bot.send_email()
             
+            if success:
+                ColorLogger.success(f"Test email sent successfully to: {test_email}")
+            else:
+                ColorLogger.error(f"Failed to send test email to: {test_email}")
+            
             return jsonify({
                 "success": success,
                 "message": "Test email sent" if success else "Failed to send test email",
@@ -504,6 +539,7 @@ def create_app():
             })
             
         except Exception as e:
+            ColorLogger.error(f"Error in test email: {str(e)}")
             return jsonify({
                 "success": False,
                 "error": str(e)
