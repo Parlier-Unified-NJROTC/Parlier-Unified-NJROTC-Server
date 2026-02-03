@@ -235,7 +235,13 @@ def create_app():
             
             from workers.gmail_bot import GmailAPIBot
             
-            bot = GmailAPIBot(last_name, "", selected_items, recipient_email, send_both_templates=False)
+            bot = GmailAPIBot(last_name, "", selected_items, recipient_email)
+            
+            bot.email_templates = [{
+                "subject": "NJROTC Program Signup Confirmation",
+                "body_html": bot.generate_signup_confirmation(),
+                "is_admin": False
+            }]
             
             if extra_data:
                 bot.extra_data = extra_data
@@ -245,7 +251,7 @@ def create_app():
             if success:
                 ColorLogger.success(f"User confirmation email sent successfully to {recipient_email}")
             else:
-                ColorLogger.error(f"Failed to send user confirmation email to {recipient_email}")
+                ColorLogger.error(f"Failed to send user email to {recipient_email}")
                 
             ColorLogger.info(f"=== USER EMAIL BOT COMPLETE ===")
             
@@ -331,9 +337,8 @@ def create_app():
                 f"Email: {data['email']}",
                 f"IP Address: {ip_address}",
                 f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                f"NOTE: Student signup - user confirmation only"
+                f"NOTE: Student signup confirmation"
             ]
-            ColorLogger.success(f"IP Address: {ip_address}")
             
             admin_selected_items = [
                 f"Student: {data['fullName']}",
@@ -523,8 +528,7 @@ def create_app():
                 last_name="Test",
                 rank="",
                 selected_items=["Test Email from NJROTC Website"],
-                recipient_email=test_email,
-                send_both_templates=False
+                recipient_email=test_email
             )
             
             success = bot.send_email()
