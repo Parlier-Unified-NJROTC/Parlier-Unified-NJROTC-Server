@@ -228,9 +228,67 @@ def create_app():
         
         return True, "Valid"
     
-    def run_email_bot(last_name, selected_items, recipient_email, extra_data=None):
+    def run_user_confirmation_email(last_name, selected_items, recipient_email, extra_data=None):
         try:
-            ColorLogger.info(f"=== STARTING EMAIL BOT (USER - BOTH TEMPLATES) ===")
+            ColorLogger.info(f"=== STARTING USER CONFIRMATION EMAIL ===")
+            ColorLogger.info(f"Recipient: {recipient_email}")
+            
+            from workers.gmail_bot import GmailAPIBot
+            
+            bot = GmailAPIBot(last_name, "", selected_items, recipient_email, send_both_templates=False)
+            
+            if extra_data:
+                bot.extra_data = extra_data
+            
+            success = bot.send_email()
+            
+            if success:
+                ColorLogger.success(f"User confirmation email sent successfully to {recipient_email}")
+            else:
+                ColorLogger.error(f"Failed to send user confirmation email to {recipient_email}")
+                
+            ColorLogger.info(f"=== USER EMAIL COMPLETE ===")
+            
+        except Exception as e:
+            ColorLogger.error(f"ERROR in user confirmation email: {str(e)}")
+            import traceback
+            traceback.print_exc()
+    
+    def run_admin_notification_email(last_name, selected_items, recipient_email, extra_data=None):
+        try:
+            ColorLogger.info(f"=== STARTING ADMIN NOTIFICATION EMAIL ===")
+            ColorLogger.info(f"Admin Recipient: {recipient_email}")
+            
+            from workers.gmail_bot import GmailAPIBot
+            
+            bot = GmailAPIBot(last_name, "", selected_items, recipient_email)
+            
+            bot.email_templates = [{
+                "subject": "NJROTC Program Signup Notification",
+                "body_html": bot.generate_admin_signup_notification(),
+                "is_admin": True
+            }]
+            
+            if extra_data:
+                bot.extra_data = extra_data
+            
+            success = bot.send_email()
+            
+            if success:
+                ColorLogger.success(f"Admin notification email sent successfully to {recipient_email}")
+            else:
+                ColorLogger.error(f"Failed to send admin notification email to {recipient_email}")
+                
+            ColorLogger.info(f"=== ADMIN NOTIFICATION COMPLETE ===")
+            
+        except Exception as e:
+            ColorLogger.error(f"ERROR in admin notification email: {str(e)}")
+            import traceback
+            traceback.print_exc()
+    
+    def run_suggestion_email(last_name, selected_items, recipient_email, extra_data=None):
+        try:
+            ColorLogger.info(f"=== STARTING SUGGESTION EMAIL ===")
             ColorLogger.info(f"Recipient: {recipient_email}")
             
             from workers.gmail_bot import GmailAPIBot
@@ -243,46 +301,14 @@ def create_app():
             success = bot.send_email()
             
             if success:
-                ColorLogger.success(f"Email with both templates sent successfully to {recipient_email}")
+                ColorLogger.success(f"Suggestion email sent successfully to {recipient_email}")
             else:
-                ColorLogger.error(f"Failed to send email to {recipient_email}")
+                ColorLogger.error(f"Failed to send suggestion email to {recipient_email}")
                 
-            ColorLogger.info(f"=== EMAIL BOT COMPLETE ===")
+            ColorLogger.info(f"=== SUGGESTION EMAIL COMPLETE ===")
             
         except Exception as e:
-            ColorLogger.error(f"ERROR in email bot: {str(e)}")
-            import traceback
-            traceback.print_exc()
-    
-    def run_admin_email_only(last_name, selected_items, recipient_email, extra_data=None):
-        try:
-            ColorLogger.info(f"=== STARTING ADMIN-ONLY EMAIL BOT ===")
-            ColorLogger.info(f"Admin Recipient: {recipient_email}")
-            
-            from workers.gmail_bot import GmailAPIBot
-            
-            bot = GmailAPIBot(last_name, "", selected_items, recipient_email)
-            
-            bot.email_templates = [{
-                "subject": "NJROTC Program Signup Confirmation (Admin Copy)",
-                "body_html": bot.generate_admin_signup_notification(),
-                "is_admin": True
-            }]
-            
-            if extra_data:
-                bot.extra_data = extra_data
-            
-            success = bot.send_email()
-            
-            if success:
-                ColorLogger.success(f"Admin-only email sent successfully to {recipient_email}")
-            else:
-                ColorLogger.error(f"Failed to send admin-only email to {recipient_email}")
-                
-            ColorLogger.info(f"=== ADMIN-ONLY EMAIL BOT COMPLETE ===")
-            
-        except Exception as e:
-            ColorLogger.error(f"ERROR in admin-only email bot: {str(e)}")
+            ColorLogger.error(f"ERROR in suggestion email: {str(e)}")
             import traceback
             traceback.print_exc()
     
@@ -331,7 +357,7 @@ def create_app():
                 f"Email: {data['email']}",
                 f"IP Address: {ip_address}",
                 f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                f"NOTE: Student signup - sending both user and admin copies"
+                f"NOTE: Student signup confirmation"
             ]
             
             admin_selected_items = [
@@ -356,23 +382,23 @@ def create_app():
             }
 
             user_email_thread = threading.Thread(
-                target=run_email_bot,
+                target=run_user_confirmation_email,
                 args=(last_name, user_selected_items, data['email'], extra_data)
             )
             user_email_thread.daemon = True
             user_email_thread.start()
             
-            ColorLogger.success(f"User email with BOTH templates queued for: {data['email']}")
+            ColorLogger.success(f"User confirmation email queued for: {data['email']}")
             
             admin_email = os.getenv('ADMIN_EMAIL')
             if admin_email and admin_email.strip():
                 admin_email_thread = threading.Thread(
-                    target=run_admin_email_only,
+                    target=run_admin_notification_email,
                     args=(last_name, admin_selected_items, admin_email, extra_data)
                 )
                 admin_email_thread.daemon = True
                 admin_email_thread.start()
-                ColorLogger.success(f"Admin notification email queued for actual admin: {admin_email}")
+                ColorLogger.success(f"Admin notification email queued for: {admin_email}")
             
             ColorLogger.success(f"Signup processed successfully for: {data['fullName']} ({data['email']})")
             return jsonify({
@@ -457,7 +483,7 @@ def create_app():
             
             if admin_email and admin_email.strip():
                 email_thread = threading.Thread(
-                    target=run_email_bot,
+                    target=run_suggestion_email,
                     args=(last_name, selected_items, admin_email, extra_data)
                 )
                 email_thread.daemon = True
