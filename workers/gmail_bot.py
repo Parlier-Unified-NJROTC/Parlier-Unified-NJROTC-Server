@@ -337,15 +337,6 @@ class GmailAPIBot:
 
                     <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #e6b220; border-radius:12px; margin-bottom:15px;">
                         <tr>
-                            <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">From</td>
-                        </tr>
-                        <tr>
-                            <td style="font-size:18px; font-weight:600; color:#fafaf5;">{data['full_name'] or self.user_last_name}</td>
-                        </tr>
-                    </table>
-
-                    <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #e6b220; border-radius:12px; margin-bottom:15px;">
-                        <tr>
                             <td style="color:#e6b220; font-size:12px; text-transform:uppercase;">Received</td>
                         </tr>
                         <tr>
