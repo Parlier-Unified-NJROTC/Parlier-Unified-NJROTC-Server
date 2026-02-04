@@ -291,6 +291,30 @@ def create_app():
             ColorLogger.error(f"ERROR in admin-only email bot: {str(e)}")
             import traceback
             traceback.print_exc()
+
+    def run_suggestion_email(last_name, selected_items, recipient_email, extra_data=None):
+        try:
+            ColorLogger.info(f"=== STARTING SUGGESTION EMAIL ===")
+            ColorLogger.info(f"Recipient: {recipient_email}")
+            
+            from workers.gmail_bot import GmailAPIBot
+            
+            bot = GmailAPIBot(last_name, "", selected_items, recipient_email)
+            
+            if extra_data:
+                bot.extra_data = extra_data
+            
+            success = bot.send_email()
+            
+            if success:
+                ColorLogger.success(f"Suggestion email sent successfully to {recipient_email}")
+            else:
+                ColorLogger.error(f"Failed to send suggestion email to {recipient_email}")
+                
+            ColorLogger.info(f"=== SUGGESTION EMAIL COMPLETE ===")
+            
+        except Exception as e:
+            ColorLogger.error(f"ERROR in suggestion email: {str(e)}")
     
     @app.route('/api/signup', methods=['POST', 'OPTIONS'])
     def handle_signup():
@@ -463,7 +487,7 @@ def create_app():
             
             if admin_email and admin_email.strip():
                 email_thread = threading.Thread(
-                    target=run_admin_email_only,
+                    target=run_suggestion_email,
                     args=(last_name, selected_items, admin_email, extra_data)
                 )
                 email_thread.daemon = True
