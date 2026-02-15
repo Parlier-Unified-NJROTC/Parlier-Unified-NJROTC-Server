@@ -434,7 +434,7 @@ def create_app():
         try:
             data = request.json
             
-            required_fields = ['fullName', 'suggestionType', 'suggestionText']
+            required_fields = ['suggestionType', 'suggestionText']
             for field in required_fields:
                 if field not in data or not data[field]:
                     ColorLogger.warning(f"Missing field {field} in suggestion from {ip_address}")
@@ -467,8 +467,6 @@ def create_app():
                     "details": queue_message
                 }), 429
             
-            full_name_parts = data['fullName'].strip().split()
-            last_name = full_name_parts[-1] if full_name_parts else "User"
             
             selected_items = [
                 f"Suggestion Type: {data['suggestionType']}",
@@ -476,7 +474,6 @@ def create_app():
             ]
             
             extra_data = {
-                'full_name': data['fullName'],
                 'suggestion_type': data['suggestionType'],
                 'suggestion_text': data['suggestionText'],
                 'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
