@@ -491,7 +491,7 @@ def create_app():
                 email_thread.start()
                 ColorLogger.success(f"Suggestion email queued for admin: {admin_email}")
             
-            ColorLogger.success(f"Suggestion processed from: {data['ip_address']}")
+            ColorLogger.success(f"Suggestion processed from: {ip_address}")
             return jsonify({
                 "success": True,
                 "message": "Suggestion submitted successfully",
