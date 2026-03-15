@@ -434,7 +434,7 @@ def create_app():
         try:
             data = request.json
             
-            required_fields = ['suggestionType', 'suggestionText']
+            required_fields = ['fullName', 'suggestionType', 'suggestionText']
             for field in required_fields:
                 if field not in data or not data[field]:
                     ColorLogger.warning(f"Missing field {field} in suggestion from {ip_address}")
@@ -467,6 +467,8 @@ def create_app():
                     "details": queue_message
                 }), 429
             
+            full_name_parts = data['fullName'].strip().split()
+            last_name = full_name_parts[-1] if full_name_parts else "User"
             
             selected_items = [
                 f"Suggestion Type: {data['suggestionType']}",
@@ -474,10 +476,11 @@ def create_app():
             ]
             
             extra_data = {
+                'full_name': data['fullName'],
                 'suggestion_type': data['suggestionType'],
                 'suggestion_text': data['suggestionText'],
                 'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'ip_address': ip_address
+                'ip_address': c
             }
             
             admin_email = os.getenv('ADMIN_EMAIL')
@@ -485,20 +488,19 @@ def create_app():
             if admin_email and admin_email.strip():
                 email_thread = threading.Thread(
                     target=run_suggestion_email,
-                    args=(selected_items, admin_email, extra_data)
+                    args=(last_name, selected_items, admin_email, extra_data)
                 )
                 email_thread.daemon = True
                 email_thread.start()
                 ColorLogger.success(f"Suggestion email queued for admin: {admin_email}")
             
-            ColorLogger.success(f"Suggestion processed from: {data['fullName']}")
+            ColorLogger.success(f"Suggestion processed from: {data['ip_address']}")
             return jsonify({
                 "success": True,
                 "message": "Suggestion submitted successfully",
                 "email_triggered": True,
                 "queue_position": request_queue.queue.qsize(),
                 "data": {
-                    "name": data['fullName'],
                     "type": data['suggestionType'],
                     "timestamp": datetime.now().isoformat()
                 }
