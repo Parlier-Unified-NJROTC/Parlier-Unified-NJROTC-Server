@@ -477,7 +477,7 @@ def create_app():
                 'suggestion_type': data['suggestionType'],
                 'suggestion_text': data['suggestionText'],
                 'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'ip_address': c
+                'ip_address': ip_address
             }
             
             admin_email = os.getenv('ADMIN_EMAIL')
@@ -491,13 +491,14 @@ def create_app():
                 email_thread.start()
                 ColorLogger.success(f"Suggestion email queued for admin: {admin_email}")
             
-            ColorLogger.success(f"Suggestion processed from: {data['ip_address']}")
+            ColorLogger.success(f"Suggestion processed from: {data['fullName']}")
             return jsonify({
                 "success": True,
                 "message": "Suggestion submitted successfully",
                 "email_triggered": True,
                 "queue_position": request_queue.queue.qsize(),
                 "data": {
+                    "name": data['fullName'],
                     "type": data['suggestionType'],
                     "timestamp": datetime.now().isoformat()
                 }
