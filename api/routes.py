@@ -466,9 +466,7 @@ def create_app():
                     "error": "System busy. Please try again later.",
                     "details": queue_message
                 }), 429
-            
-            full_name_parts = data['fullName'].strip().split()
-            last_name = full_name_parts[-1] if full_name_parts else "User"
+
             
             selected_items = [
                 f"Suggestion Type: {data['suggestionType']}",
@@ -476,7 +474,6 @@ def create_app():
             ]
             
             extra_data = {
-                'full_name': data['fullName'],
                 'suggestion_type': data['suggestionType'],
                 'suggestion_text': data['suggestionText'],
                 'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -488,7 +485,7 @@ def create_app():
             if admin_email and admin_email.strip():
                 email_thread = threading.Thread(
                     target=run_suggestion_email,
-                    args=(last_name, selected_items, admin_email, extra_data)
+                    args=(selected_items, admin_email, extra_data)
                 )
                 email_thread.daemon = True
                 email_thread.start()
