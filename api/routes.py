@@ -485,7 +485,7 @@ def create_app():
             if admin_email and admin_email.strip():
                 email_thread = threading.Thread(
                     target=run_suggestion_email,
-                    args=(last_name, selected_items, admin_email, extra_data)
+                    args=(selected_items, admin_email, extra_data)
                 )
                 email_thread.daemon = True
                 email_thread.start()
