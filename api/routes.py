@@ -299,7 +299,7 @@ def create_app():
             
             from workers.gmail_bot import GmailAPIBot
             
-            bot = GmailAPIBot(last_name, "", selected_items, recipient_email)
+            bot = GmailAPIBot( selected_items, recipient_email)
             
             if extra_data:
                 bot.extra_data = extra_data
@@ -545,11 +545,13 @@ def create_app():
             from workers.gmail_bot import GmailAPIBot
             
             bot = GmailAPIBot(
-                last_name="Test",
-                rank="",
-                selected_items=["Test Email from NJROTC Website"],
-                recipient_email=test_email
+                last_name="",            
+                rank="",                  
+                selected_items=selected_items,
+                recipient_email=admin_email,
+                send_both_templates=False
             )
+
             
             success = bot.send_email()
             
