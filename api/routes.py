@@ -477,7 +477,7 @@ def create_app():
                 'suggestion_type': data['suggestionType'],
                 'suggestion_text': data['suggestionText'],
                 'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'ip_address': c
+                'ip_address': ip_address
             }
             
             admin_email = os.getenv('ADMIN_EMAIL')
