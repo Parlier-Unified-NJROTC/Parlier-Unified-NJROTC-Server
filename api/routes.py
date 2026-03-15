@@ -292,41 +292,41 @@ def create_app():
             import traceback
             traceback.print_exc()
 
-def run_suggestion_email(selected_items, recipient_email, extra_data=None):
-    try:
-        ColorLogger.info(f"=== STARTING SUGGESTION EMAIL ===")
-        ColorLogger.info(f"Recipient: {recipient_email}")
-        
-        from workers.gmail_bot import GmailAPIBot
-        
-        bot = GmailAPIBot(
-            last_name="",
-            rank="",
-            selected_items=selected_items,
-            recipient_email=recipient_email,
-            send_both_templates=False
-        )
-
-        bot.email_templates = [{
-            "subject": "NJROTC Suggestion Received",
-            "body_html": bot.generate_suggestion_email(),
-            "is_admin": True
-        }]
-        
-        if extra_data:
-            bot.extra_data = extra_data
-        
-        success = bot.send_email()
-        
-        if success:
-            ColorLogger.success(f"Suggestion email sent successfully to {recipient_email}")
-        else:
-            ColorLogger.error(f"Failed to send suggestion email to {recipient_email}")
+    def run_suggestion_email(selected_items, recipient_email, extra_data=None):
+        try:
+            ColorLogger.info(f"=== STARTING SUGGESTION EMAIL ===")
+            ColorLogger.info(f"Recipient: {recipient_email}")
             
-        ColorLogger.info(f"=== SUGGESTION EMAIL COMPLETE ===")
-        
-    except Exception as e:
-        ColorLogger.error(f"ERROR in suggestion email: {str(e)}")
+            from workers.gmail_bot import GmailAPIBot
+            
+            bot = GmailAPIBot(
+                last_name="",
+                rank="",
+                selected_items=selected_items,
+                recipient_email=recipient_email,
+                send_both_templates=False
+            )
+
+            bot.email_templates = [{
+                "subject": "NJROTC Suggestion Received",
+                "body_html": bot.generate_suggestion_email(),
+                "is_admin": True
+            }]
+            
+            if extra_data:
+                bot.extra_data = extra_data
+            
+            success = bot.send_email()
+            
+            if success:
+                ColorLogger.success(f"Suggestion email sent successfully to {recipient_email}")
+            else:
+                ColorLogger.error(f"Failed to send suggestion email to {recipient_email}")
+                
+            ColorLogger.info(f"=== SUGGESTION EMAIL COMPLETE ===")
+            
+        except Exception as e:
+            ColorLogger.error(f"ERROR in suggestion email: {str(e)}")
     
     @app.route('/api/signup', methods=['POST', 'OPTIONS'])
     def handle_signup():
