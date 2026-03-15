@@ -434,7 +434,7 @@ def create_app():
         try:
             data = request.json
             
-            required_fields = ['fullName', 'suggestionType', 'suggestionText']
+            required_fields = [ 'suggestionType', 'suggestionText']
             for field in required_fields:
                 if field not in data or not data[field]:
                     ColorLogger.warning(f"Missing field {field} in suggestion from {ip_address}")
