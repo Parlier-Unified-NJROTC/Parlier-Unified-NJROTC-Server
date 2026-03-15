@@ -292,7 +292,7 @@ def create_app():
             import traceback
             traceback.print_exc()
 
-    def run_suggestion_email(last_name, selected_items, recipient_email, extra_data=None):
+    def run_suggestion_email(selected_items, recipient_email, extra_data=None):
         try:
             ColorLogger.info(f"=== STARTING SUGGESTION EMAIL ===")
             ColorLogger.info(f"Recipient: {recipient_email}")
@@ -300,6 +300,12 @@ def create_app():
             from workers.gmail_bot import GmailAPIBot
             
             bot = GmailAPIBot( selected_items, recipient_email)
+
+            bot.email_templates = [{
+                "subject": "NJROTC Suggestion Received",
+                "body_html": bot.generate_suggestion_email(),
+                "is_admin": True
+            }]
             
             if extra_data:
                 bot.extra_data = extra_data
@@ -545,7 +551,6 @@ def create_app():
             from workers.gmail_bot import GmailAPIBot
             
             bot = GmailAPIBot(
-                last_name="",            
                 rank="",                  
                 selected_items=selected_items,
                 recipient_email=admin_email,
