@@ -16,29 +16,29 @@ class SimpleRateLimiter:
         self.requests = {}
         self.lock = Lock()
     
-    def check_limit(self, ip, limit=100, window=3600):
+    def check_limit(self, identifier, limit=100, window=3600):
         with self.lock:
             current_time = time.time()
             self._clean_old_entries(current_time, window)
             
-            if ip not in self.requests:
-                self.requests[ip] = []
+            if identifier not in self.requests:
+                self.requests[identifier] = []
             
             window_start = current_time - window
-            request_count = sum(1 for ts in self.requests[ip] if ts > window_start)
+            request_count = sum(1 for ts in self.requests[identifier] if ts > window_start)
             
             if request_count >= limit:
                 return False
             
-            self.requests[ip].append(current_time)
+            self.requests[identifier].append(current_time)
             return True
     
     def _clean_old_entries(self, current_time, window):
         cutoff = current_time - (window * 2) 
-        for ip in list(self.requests.keys()):
-            self.requests[ip] = [ts for ts in self.requests[ip] if ts > cutoff]
-            if not self.requests[ip]:
-                del self.requests[ip]
+        for identifier in list(self.requests.keys()):
+            self.requests[identifier] = [ts for ts in self.requests[identifier] if ts > cutoff]
+            if not self.requests[identifier]:
+                del self.requests[identifier]
 
 class RequestQueue:
     def __init__(self, max_queue_size=100, max_workers=5):
@@ -54,47 +54,47 @@ class RequestQueue:
             worker = threading.Thread(target=self._process_queue, daemon=True)
             worker.start()
     
-    def add_request(self, endpoint, data, ip_address):
+    def add_request(self, endpoint, data, identifier):
         current_time = time.time()
         
-        if self._check_rate_limit(ip_address, current_time):
+        if self._check_rate_limit(identifier, current_time):
             return False, "Rate limit exceeded"
         
         try:
             self.queue.put_nowait({
                 'endpoint': endpoint,
                 'data': data,
-                'ip': ip_address,
+                'identifier': identifier,
                 'timestamp': current_time
             })
             
-            if ip_address not in self.request_timestamps:
-                self.request_timestamps[ip_address] = deque(maxlen=200)
-            self.request_timestamps[ip_address].append(current_time)
+            if identifier not in self.request_timestamps:
+                self.request_timestamps[identifier] = deque(maxlen=200)
+            self.request_timestamps[identifier].append(current_time)
             
             return True, "Request queued"
         except:
             return False, "Queue full"
     
-    def _check_rate_limit(self, ip_address, current_time, window_seconds=60, max_requests=100):
-        if ip_address not in self.request_timestamps:
+    def _check_rate_limit(self, identifier, current_time, window_seconds=60, max_requests=100):
+        if identifier not in self.request_timestamps:
             return False
         
         window_start = current_time - window_seconds
-        request_count = sum(1 for ts in self.request_timestamps[ip_address] 
+        request_count = sum(1 for ts in self.request_timestamps[identifier] 
                           if ts > window_start)
         
         return request_count >= max_requests
     
     def _clean_old_timestamps(self, current_time, max_age=300):
         cutoff = current_time - max_age
-        for ip in list(self.request_timestamps.keys()):
-            self.request_timestamps[ip] = deque(
-                [ts for ts in self.request_timestamps[ip] if ts > cutoff],
+        for identifier in list(self.request_timestamps.keys()):
+            self.request_timestamps[identifier] = deque(
+                [ts for ts in self.request_timestamps[identifier] if ts > cutoff],
                 maxlen=200
             )
-            if not self.request_timestamps[ip]:
-                del self.request_timestamps[ip]
+            if not self.request_timestamps[identifier]:
+                del self.request_timestamps[identifier]
     
     def _process_queue(self):
         while True:
@@ -168,17 +168,18 @@ def create_app():
         if request.method == 'OPTIONS':
             return
 
-        ip = request.remote_addr
+        # Use session ID or generate unique identifier instead of IP
+        identifier = request.headers.get('X-Session-ID', 'anonymous')
         
-        if not rate_limiter.check_limit(ip, limit=1000, window=86400):
-            ColorLogger.warning(f"Daily rate limit exceeded for IP: {ip}")
+        if not rate_limiter.check_limit(identifier, limit=1000, window=86400):
+            ColorLogger.warning(f"Daily rate limit exceeded for identifier: {identifier}")
             return jsonify({
                 "error": "Daily rate limit exceeded"
             }), 429
         
         if request.path.startswith('/api/'):
-            if not rate_limiter.check_limit(ip, limit=500, window=3600):
-                ColorLogger.warning(f"Hourly rate limit exceeded for IP: {ip}")
+            if not rate_limiter.check_limit(identifier, limit=500, window=3600):
+                ColorLogger.warning(f"Hourly rate limit exceeded for identifier: {identifier}")
                 return jsonify({
                     "error": "Hourly rate limit exceeded"
                 }), 429
@@ -333,18 +334,18 @@ def create_app():
         if request.method == 'OPTIONS':
             return '', 200
         
-        ip_address = request.remote_addr
+        identifier = request.headers.get('X-Session-ID', 'anonymous')
         
         try:
             data = request.json
             
             is_valid, message = validate_signup_data(data)
             if not is_valid:
-                ColorLogger.warning(f"Invalid signup data from {ip_address}: {message}")
+                ColorLogger.warning(f"Invalid signup data: {message}")
                 return jsonify({"error": message}), 400
             
-            if not rate_limiter.check_limit(ip_address, limit=50, window=3600):
-                ColorLogger.warning(f"Signup rate limit exceeded for IP: {ip_address}")
+            if not rate_limiter.check_limit(identifier, limit=50, window=3600):
+                ColorLogger.warning(f"Signup rate limit exceeded for identifier: {identifier}")
                 return jsonify({
                     "error": "Too many signup requests. Please try again later."
                 }), 429
@@ -352,11 +353,11 @@ def create_app():
             queued, queue_message = request_queue.add_request(
                 '/api/signup', 
                 data, 
-                ip_address
+                identifier
             )
             
             if not queued:
-                ColorLogger.warning(f"Queue full for IP: {ip_address}")
+                ColorLogger.warning(f"Queue full for identifier: {identifier}")
                 return jsonify({
                     "error": "System busy. Please try again later.",
                     "details": queue_message
@@ -371,7 +372,6 @@ def create_app():
                 f"Student ID: {data['schoolId']}",
                 f"Reason for joining: {data['reason']}",
                 f"Email: {data['email']}",
-                f"IP Address: {ip_address}",
                 f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
                 f"NOTE: Student signup confirmation"
             ]
@@ -382,7 +382,6 @@ def create_app():
                 f"Student ID: {data['schoolId']}",
                 f"Reason for joining: {data['reason']}",
                 f"Email: {data['email']}",
-                f"IP Address: {ip_address}",
                 f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
                 f"NOTE: New student signup notification for admin"
             ]
@@ -393,8 +392,7 @@ def create_app():
                 'grade': data['grade'],
                 'email': data['email'],
                 'reason': data['reason'],
-                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'ip_address': ip_address
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
 
             user_email_thread = threading.Thread(
@@ -430,7 +428,7 @@ def create_app():
             }), 200
             
         except Exception as e:
-            ColorLogger.error(f"Error processing signup from {ip_address}: {str(e)}")
+            ColorLogger.error(f"Error processing signup: {str(e)}")
             return jsonify({
                 "error": "Internal server error",
                 "details": "Please try again later"
@@ -441,27 +439,27 @@ def create_app():
         if request.method == 'OPTIONS':
             return '', 200
         
-        ip_address = request.remote_addr
+        identifier = request.headers.get('X-Session-ID', 'anonymous')
         
         try:
             data = request.json
             
-            required_fields = [ 'suggestionType', 'suggestionText']
+            required_fields = ['suggestionType', 'suggestionText']
             for field in required_fields:
                 if field not in data or not data[field]:
-                    ColorLogger.warning(f"Missing field {field} in suggestion from {ip_address}")
+                    ColorLogger.warning(f"Missing field {field} in suggestion")
                     return jsonify({
                         "error": f"Missing required field: {field}"
                     }), 400
             
-            if not rate_limiter.check_limit(ip_address, limit=200, window=600):
-                ColorLogger.warning(f"Suggestion rate limit exceeded for IP: {ip_address}")
+            if not rate_limiter.check_limit(identifier, limit=200, window=600):
+                ColorLogger.warning(f"Suggestion rate limit exceeded for identifier: {identifier}")
                 return jsonify({
                     "error": "Too many suggestion requests. Please try again later."
                 }), 429
             
             if len(data['suggestionText']) > 2000:
-                ColorLogger.warning(f"Suggestion too long from {ip_address}")
+                ColorLogger.warning(f"Suggestion too long")
                 return jsonify({
                     "error": "Suggestion text too long (max 2000 characters)"
                 }), 400
@@ -469,17 +467,16 @@ def create_app():
             queued, queue_message = request_queue.add_request(
                 '/api/suggestion', 
                 data, 
-                ip_address
+                identifier
             )
             
             if not queued:
-                ColorLogger.warning(f"Queue full for suggestion from IP: {ip_address}")
+                ColorLogger.warning(f"Queue full for suggestion")
                 return jsonify({
                     "error": "System busy. Please try again later.",
                     "details": queue_message
                 }), 429
 
-            
             selected_items = [
                 f"Suggestion Type: {data['suggestionType']}",
                 f"Suggestion: {data['suggestionText'][:500]}..."
@@ -488,8 +485,7 @@ def create_app():
             extra_data = {
                 'suggestion_type': data['suggestionType'],
                 'suggestion_text': data['suggestionText'],
-                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                'ip_address': ip_address
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
             
             admin_email = os.getenv('ADMIN_EMAIL')
@@ -503,7 +499,7 @@ def create_app():
                 email_thread.start()
                 ColorLogger.success(f"Suggestion email queued for admin: {admin_email}")
             
-            ColorLogger.success(f"Suggestion processed from: {ip_address}")
+            ColorLogger.success(f"Suggestion processed successfully")
             return jsonify({
                 "success": True,
                 "message": "Suggestion submitted successfully",
@@ -516,7 +512,7 @@ def create_app():
             }), 200
             
         except Exception as e:
-            ColorLogger.error(f"Error processing suggestion from {ip_address}: {str(e)}")
+            ColorLogger.error(f"Error processing suggestion: {str(e)}")
             return jsonify({
                 "error": "Internal server error",
                 "details": "Please try again later"
@@ -556,13 +552,25 @@ def create_app():
             ColorLogger.info(f"Test email requested for: {test_email}")
             from workers.gmail_bot import GmailAPIBot
             
+            selected_items = [
+                "Test Email",
+                "This is a test message from the NJROTC system",
+                f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            ]
+            
             bot = GmailAPIBot(
-                rank="",                  
+                last_name="Test",
+                rank="",
                 selected_items=selected_items,
-                recipient_email=admin_email,
+                recipient_email=test_email,
                 send_both_templates=False
             )
-
+            
+            bot.email_templates = [{
+                "subject": "NJROTC System Test Email",
+                "body_html": "<h1>Test Email</h1><p>This is a test email from the NJROTC system.</p><p>If you received this, the email system is working correctly.</p>",
+                "is_admin": False
+            }]
             
             success = bot.send_email()
             
@@ -585,3 +593,7 @@ def create_app():
             }), 500
     
     return app
+
+if __name__ == '__main__':
+    app = create_app()
+    app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)

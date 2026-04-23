@@ -174,9 +174,7 @@ class GmailAPIBot:
             <tr>
                 <td style="padding:25px;">
                     
-                    <div style="text-align:center; padding:15px; border-radius:8px; margin-bottom:25px;">
-                        <h2 style="margin:0; color:white; font-size:24px;">Test</h2>
-                    </div>
+                
 
                     <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #e6b220; border-radius:12px; margin-bottom:15px;">
                         <tr>
@@ -251,9 +249,7 @@ class GmailAPIBot:
             <tr>
                 <td style="padding:25px;">
 
-                    <div style="text-align:center; padding:15px; border-radius:8px; margin-bottom:25px;">
-                        <h2 style="margin:0; color:white; font-size:24px;">Test</h2>
-                    </div>
+                    
 
                     <table width="100%" cellpadding="10" cellspacing="0" style="background:#000000; border:1px solid #e6b220; border-radius:12px; margin-bottom:15px;">
                         <tr>
